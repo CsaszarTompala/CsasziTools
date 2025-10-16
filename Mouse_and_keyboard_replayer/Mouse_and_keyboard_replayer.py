@@ -19,7 +19,6 @@ Requirements:
 
 import json
 import time
-import sys
 import os
 from typing import List, Dict, Any, Optional
 from threading import Event
@@ -184,18 +183,34 @@ class MouseKeyboardRecorder:
     
     def save_recording(self, filename: str) -> bool:
         """
-        Save the recorded events to a JSON file.
+        Save the recorded events to a JSON file in the recordings folder.
         
         Arguments:
-            filename: Path to the JSON file to save
+            filename: Name of the JSON file to save (with or without .json extension)
             
         Returns:
             True if save was successful, False otherwise
         """
         try:
-            with open(filename, 'w') as f:
+            # Ensure filename has .json extension
+            if not filename.endswith('.json'):
+                filename += '.json'
+            
+            # Get the directory of the current script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            # Create recordings folder path relative to script directory
+            recordings_dir = os.path.join(script_dir, 'recordings')
+            
+            # Create recordings directory if it doesn't exist
+            if not os.path.exists(recordings_dir):
+                os.makedirs(recordings_dir)
+            
+            # Create full path for the recording file
+            full_path = os.path.join(recordings_dir, filename)
+            
+            with open(full_path, 'w') as f:
                 json.dump(self.events, f, indent=2)
-            print(f"Recording saved to {filename}")
+            print(f"Recording saved to {full_path}")
             return True
         except Exception as e:
             print(f"Error saving recording: {e}")
@@ -203,26 +218,82 @@ class MouseKeyboardRecorder:
     
     def load_recording(self, filename: str) -> bool:
         """
-        Load recorded events from a JSON file.
+        Load recorded events from a JSON file in the recordings folder.
         
         Arguments:
-            filename: Path to the JSON file to load
+            filename: Name of the JSON file to load (with or without .json extension, can include path)
             
         Returns:
             True if load was successful, False otherwise
         """
         try:
-            if not os.path.exists(filename):
-                print(f"File {filename} does not exist.")
+            # If filename contains path separators, use it as is (but still check for .json extension)
+            if os.path.sep in filename or '/' in filename:
+                # For full paths, try with and without .json extension
+                if not filename.endswith('.json'):
+                    # Try with .json extension first
+                    json_filename = filename + '.json'
+                    if os.path.exists(json_filename):
+                        full_path = json_filename
+                    elif os.path.exists(filename):
+                        full_path = filename
+                    else:
+                        print(f"File {filename} or {json_filename} does not exist.")
+                        return False
+                else:
+                    full_path = filename
+            else:
+                # Otherwise, look in the recordings folder
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                recordings_dir = os.path.join(script_dir, 'recordings')
+                
+                # Try with .json extension first if not already present
+                if not filename.endswith('.json'):
+                    json_filename = filename + '.json'
+                    json_full_path = os.path.join(recordings_dir, json_filename)
+                    original_full_path = os.path.join(recordings_dir, filename)
+                    
+                    if os.path.exists(json_full_path):
+                        full_path = json_full_path
+                    elif os.path.exists(original_full_path):
+                        full_path = original_full_path
+                    else:
+                        print(f"File {json_filename} or {filename} does not exist in recordings folder.")
+                        return False
+                else:
+                    full_path = os.path.join(recordings_dir, filename)
+            
+            if not os.path.exists(full_path):
+                print(f"File {full_path} does not exist.")
                 return False
             
-            with open(filename, 'r') as f:
+            with open(full_path, 'r') as f:
                 self.events = json.load(f)
-            print(f"Recording loaded from {filename}. {len(self.events)} events loaded.")
+            print(f"Recording loaded from {full_path}. {len(self.events)} events loaded.")
             return True
         except Exception as e:
             print(f"Error loading recording: {e}")
             return False
+    
+    def list_available_recordings(self) -> List[str]:
+        """
+        List all available recording files in the recordings folder.
+        
+        Returns:
+            List of recording filenames
+        """
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            recordings_dir = os.path.join(script_dir, 'recordings')
+            
+            if not os.path.exists(recordings_dir):
+                return []
+            
+            recordings = [f for f in os.listdir(recordings_dir) if f.endswith('.json')]
+            return recordings
+        except Exception as e:
+            print(f"Error listing recordings: {e}")
+            return []
     
     def replay_events(self) -> None:
         """Replay the loaded events in a continuous loop until End key is pressed."""
@@ -314,66 +385,140 @@ class MouseKeyboardRecorder:
             print("Replay stopped.")
 
 
-def main() -> None:
-    """Main application loop."""
-    recorder = MouseKeyboardRecorder()
-    
-    print("=== Mouse and Keyboard Replayer ===")
-    print("This application can record and replay mouse clicks and keyboard keystrokes.")
+def clear_terminal() -> None:
+    """Clear the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def display_menu() -> None:
+    """Display the main menu with ASCII border."""
+    clear_terminal()
+    print("╔" + "═" * 58 + "╗")
+    print("║" + " " * 58 + "║")
+    print("║" + "    MOUSE AND KEYBOARD REPLAYER".center(58) + "║")
+    print("║" + " " * 58 + "║")
+    print("║" + "  Record and replay mouse clicks and keyboard events".center(58) + "║")
+    print("║" + " " * 58 + "║")
+    print("╠" + "═" * 58 + "╣")
+    print("║" + " " * 58 + "║")
+    print("║" + "  OPTIONS:".ljust(58) + "║")
+    print("║" + " " * 58 + "║")
+    print("║" + "    [0] + ENTER → Start Recording".ljust(58) + "║")
+    print("║" + "    [1] + ENTER → Load and Replay Recording".ljust(58) + "║")
+    print("║" + "    [2] + ENTER → Exit Application".ljust(58) + "║")
+    print("║" + " " * 58 + "║")
+    print("╚" + "═" * 58 + "╝")
     print()
+
+def main() -> None:
+    """Main application loop with improved menu interface."""
+    recorder = MouseKeyboardRecorder()
     
     while True:
         try:
-            choice = input("Do you want to record? (yes/no): ").lower().strip()
+            display_menu()
+            choice = input("Enter your choice: ").strip()
             
-            if choice in ['yes', 'y']:
+            if choice == '0':
                 # Recording mode
+                clear_terminal()
+                print("╔" + "═" * 40 + "╗")
+                print("║" + "  RECORDING MODE".center(40) + "║")
+                print("╚" + "═" * 40 + "╝")
+                print()
+                
                 recorder.start_recording()
                 
                 if recorder.events:
+                    print()
+                    print("╔" + "═" * 50 + "╗")
+                    print("║" + "  SAVE RECORDING".center(50) + "║")
+                    print("╚" + "═" * 50 + "╝")
+                    print()
+                    
                     # Ask for filename to save
                     while True:
-                        filename = input("Enter filename to save recording (with .json extension): ").strip()
-                        if not filename.endswith('.json'):
-                            filename += '.json'
+                        filename = input("Enter filename to save recording (.json extension optional): ").strip()
                         
                         if recorder.save_recording(filename):
+                            print("\nRecording saved successfully!")
+                            input("\nPress ENTER to return to main menu...")
                             break
                         else:
-                            retry = input("Failed to save. Try again? (yes/no): ").lower().strip()
-                            if retry not in ['yes', 'y']:
+                            retry = input("Failed to save. Try again? (y/n): ").lower().strip()
+                            if retry not in ['y', 'yes']:
                                 break
             
-            elif choice in ['no', 'n']:
+            elif choice == '1':
                 # Replay mode
+                clear_terminal()
+                print("╔" + "═" * 50 + "╗")
+                print("║" + "  LOAD AND REPLAY RECORDING".center(50) + "║")
+                print("╚" + "═" * 50 + "╝")
+                print()
+                
                 while True:
-                    json_path = input("Enter path to JSON recording file: ").strip()
+                    # Show available recordings
+                    available_recordings = recorder.list_available_recordings()
+                    if available_recordings:
+                        print("Available recordings in the recordings folder:")
+                        print("─" * 45)
+                        for i, recording in enumerate(available_recordings, 1):
+                            print(f"  {i}. {recording}")
+                        print("─" * 45)
+                        print()
+                    else:
+                        print("⚠️  No recordings found in the recordings folder.")
+                        print()
+                    
+                    json_path = input("Enter recording filename (.json extension optional): ").strip()
                     
                     if recorder.load_recording(json_path):
                         recorder.replay_events()
+                        print("\nReplay completed!")
+                        input("\nPress ENTER to return to main menu...")
                         break
                     else:
-                        retry = input("Failed to load file. Try again? (yes/no): ").lower().strip()
-                        if retry not in ['yes', 'y']:
+                        retry = input("Failed to load file. Try again? (y/n): ").lower().strip()
+                        if retry not in ['y', 'yes']:
+                            input("\nPress ENTER to return to main menu...")
                             break
-                
-                # After replay, ask if user wants to continue
-                continue_choice = input("Do you want to continue using the application? (yes/no): ").lower().strip()
-                if continue_choice not in ['yes', 'y']:
-                    break
+            
+            elif choice == '2':
+                # Exit application
+                clear_terminal()
+                print("╔" + "═" * 40 + "╗")
+                print("║" + "  GOODBYE!".center(40) + "║")
+                print("║" + " " * 40 + "║")
+                print("║" + "  Thank you for using".center(40) + "║")
+                print("║" + "  Mouse and Keyboard Replayer!".center(40) + "║")
+                print("╚" + "═" * 40 + "╝")
+                break
             
             else:
-                print("Please enter 'yes' or 'no'.")
-                continue
+                clear_terminal()
+                print("╔" + "═" * 35 + "╗")
+                print("║" + "  INVALID CHOICE!".center(35) + "║")
+                print("║" + " " * 35 + "║")
+                print("║" + "  Please enter 0, 1, or 2".center(35) + "║")
+                print("╚" + "═" * 35 + "╝")
+                print()
+                input("Press ENTER to continue...")
         
         except KeyboardInterrupt:
-            print("\nApplication interrupted by user.")
+            clear_terminal()
+            print("╔" + "═" * 40 + "╗")
+            print("║" + "  APPLICATION INTERRUPTED".center(40) + "║")
+            print("╚" + "═" * 40 + "╝")
             break
         except Exception as e:
-            print(f"An error occurred: {e}")
-            continue
-    
-    print("Thank you for using Mouse and Keyboard Replayer!")
+            clear_terminal()
+            print("╔" + "═" * 45 + "╗")
+            print("║" + "  ERROR OCCURRED".center(45) + "║")
+            print("║" + " " * 45 + "║")
+            print("║" + f"  {str(e)[:41]}".ljust(45) + "║")
+            print("╚" + "═" * 45 + "╝")
+            print()
+            input("Press ENTER to continue...")
 
 
 if __name__ == "__main__":
