@@ -1,0 +1,130 @@
+[
+  {
+    "type": "mouse",
+    "action": "press",
+    "button": "left",
+    "x": 142,
+    "y": 1433,
+    "timestamp": 3.7804269790649414
+  },
+  {
+    "type": "mouse",
+    "action": "release",
+    "button": "left",
+    "x": 142,
+    "y": 1433,
+    "timestamp": 3.8994596004486084
+  },
+  {
+    "type": "mouse",
+    "action": "press",
+    "button": "left",
+    "x": 146,
+    "y": 1412,
+    "timestamp": 4.246737718582153
+  },
+  {
+    "type": "mouse",
+    "action": "release",
+    "button": "left",
+    "x": 146,
+    "y": 1412,
+    "timestamp": 4.351524829864502
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "w",
+    "timestamp": 6.129827260971069
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "w",
+    "timestamp": 6.265453338623047
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "a",
+    "timestamp": 6.332206964492798
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "a",
+    "timestamp": 6.490074634552002
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "s",
+    "timestamp": 6.536094665527344
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "d",
+    "timestamp": 6.669505834579468
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "s",
+    "timestamp": 6.691828489303589
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "d",
+    "timestamp": 6.849272012710571
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "w",
+    "timestamp": 7.276678562164307
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "w",
+    "timestamp": 7.389581680297852
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "a",
+    "timestamp": 7.502176284790039
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "a",
+    "timestamp": 7.658856630325317
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "s",
+    "timestamp": 7.660377025604248
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "s",
+    "timestamp": 7.794389724731445
+  },
+  {
+    "type": "keyboard",
+    "action": "press",
+    "key": "d",
+    "timestamp": 7.816877603530884
+  },
+  {
+    "type": "keyboard",
+    "action": "release",
+    "key": "d",
+    "timestamp": 7.929866075515747
+  }
+]
