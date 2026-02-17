@@ -1,0 +1,6 @@
+{
+  "batch_file_path": "C:\\Users\\uig40210\\Desktop\\START_jenkins_via_application.bat",
+  "java_process_name": "java.exe",
+  "jenkins_agent_identifier": "agent.jar",
+  "countdown_seconds": 60
+}

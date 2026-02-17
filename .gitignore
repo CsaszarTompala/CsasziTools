@@ -1,0 +1,76 @@
+# ============================================================
+# .gitignore for CsasziTools
+# ============================================================
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.eggs/
+*.whl
+
+# ----- Virtual Environments -----
+.venv/
+venv/
+env/
+ENV/
+
+# ----- PyInstaller -----
+# Build artifacts and distributables
+build/
+dist/
+*.spec
+*.manifest
+
+# ----- IDE / Editor -----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ----- OS generated -----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.lnk
+
+# ----- Compiled / Executable / Binary -----
+*.exe
+*.dll
+*.so
+*.dylib
+*.pyz
+*.pkg
+*.zip
+*.7z
+*.rar
+*.tar.gz
+*.tgz
+
+# ----- PyInstaller build artifact patterns -----
+# (these live inside build/ and dist/ which are already ignored,
+#  but listed here as a safety net)
+*.toc
+*.pyz
+*.pkg
+localpycs/
+base_library.zip
+warn-*.txt
+xref-*.html
+
+# ----- Recordings (user-generated data) -----
+Mouse_and_keyboard_replayer/recordings/*.json
+Mouse_and_keyboard_replayer/recordings/*.csv
+
+# ----- Temporary / Log files -----
+*.log
+*.tmp
+*.bak
+*.orig

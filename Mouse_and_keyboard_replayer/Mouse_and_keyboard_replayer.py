@@ -6,6 +6,7 @@ save them to a JSON file, and replay them in a loop until stopped.
 
 Features:
 - Records left, right, and middle mouse button clicks with coordinates
+- Records mouse wheel scroll events with direction and intensity
 - Records all keyboard keystrokes
 - Saves recordings to JSON files
 - Replays recordings in a continuous loop
@@ -20,11 +21,16 @@ Requirements:
 import json
 import time
 import os
+import sys
 from typing import List, Dict, Any, Optional
 from threading import Event
 from pynput import mouse, keyboard
 from pynput.mouse import Button
 from pynput.keyboard import Key
+
+# Add parent directory to path to import Common modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Common.Menu import TerminalMenu
 
 
 class MouseKeyboardRecorder:
@@ -71,6 +77,31 @@ class MouseKeyboardRecorder:
         }
         self.events.append(event)
         print(f"Mouse {event['action']}: {button.name} at ({x}, {y})")
+
+    def on_mouse_scroll(self, x: int, y: int, dx: int, dy: int) -> None:
+        """
+        Handle mouse scroll events during recording.
+
+        Arguments:
+            x: X coordinate of the mouse when scrolling
+            y: Y coordinate of the mouse when scrolling
+            dx: Horizontal scroll delta
+            dy: Vertical scroll delta
+        """
+        if not self.recording:
+            return
+        current_time = time.time()
+        event = {
+            'type': 'mouse',
+            'action': 'scroll',
+            'x': x,
+            'y': y,
+            'dx': dx,
+            'dy': dy,
+            'timestamp': current_time - self.start_time
+        }
+        self.events.append(event)
+        print(f"Mouse scroll: dx={dx}, dy={dy} at ({x}, {y})")
     
     def on_key_press(self, key) -> Optional[bool]:
         """
@@ -163,7 +194,10 @@ class MouseKeyboardRecorder:
         self.start_time = time.time()
         
         # Start listeners
-        mouse_listener = mouse.Listener(on_click=self.on_mouse_click)
+        mouse_listener = mouse.Listener(
+            on_click=self.on_mouse_click,
+            on_scroll=self.on_mouse_scroll
+        )
         keyboard_listener = keyboard.Listener(
             on_press=self.on_key_press,
             on_release=self.on_key_release
@@ -352,6 +386,11 @@ class MouseKeyboardRecorder:
                             button = Button.left if event['button'] == 'left' else \
                                    Button.right if event['button'] == 'right' else Button.middle
                             mouse_controller.release(button)
+                        elif event['action'] == 'scroll':
+                            dx = int(event.get('dx', 0))
+                            dy = int(event.get('dy', 0))
+                            mouse_controller.position = (event['x'], event['y'])
+                            mouse_controller.scroll(dx, dy)
                     
                     elif event['type'] == 'keyboard':
                         try:
@@ -385,55 +424,35 @@ class MouseKeyboardRecorder:
             print("Replay stopped.")
 
 
-def clear_terminal() -> None:
-    """Clear the terminal screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def display_menu() -> None:
-    """Display the main menu with ASCII border."""
-    clear_terminal()
-    print("╔" + "═" * 58 + "╗")
-    print("║" + " " * 58 + "║")
-    print("║" + "    MOUSE AND KEYBOARD REPLAYER".center(58) + "║")
-    print("║" + " " * 58 + "║")
-    print("║" + "  Record and replay mouse clicks and keyboard events".center(58) + "║")
-    print("║" + " " * 58 + "║")
-    print("╠" + "═" * 58 + "╣")
-    print("║" + " " * 58 + "║")
-    print("║" + "  OPTIONS:".ljust(58) + "║")
-    print("║" + " " * 58 + "║")
-    print("║" + "    [0] + ENTER → Start Recording".ljust(58) + "║")
-    print("║" + "    [1] + ENTER → Load and Replay Recording".ljust(58) + "║")
-    print("║" + "    [2] + ENTER → Exit Application".ljust(58) + "║")
-    print("║" + " " * 58 + "║")
-    print("╚" + "═" * 58 + "╝")
-    print()
-
 def main() -> None:
     """Main application loop with improved menu interface."""
     recorder = MouseKeyboardRecorder()
+    menu = TerminalMenu(80)
     
     while True:
         try:
-            display_menu()
+            # Display main menu
+            menu.create_simple_menu([
+                "CENTER:MOUSE AND KEYBOARD REPLAYER",
+                "CENTER:Record and replay mouse clicks, wheel scrolls, and keyboard events",
+                [
+                    "LEFT:OPTIONS:,"
+                    "LEFT:[0] + ENTER --> Start Recording,"
+                    "LEFT:[1] + ENTER --> Load and Replay Recording,"
+                    "LEFT:[2] + ENTER --> Exit Application"
+                ]
+            ])
+            
             choice = input("Enter your choice: ").strip()
             
             if choice == '0':
                 # Recording mode
-                clear_terminal()
-                print("╔" + "═" * 40 + "╗")
-                print("║" + "  RECORDING MODE".center(40) + "║")
-                print("╚" + "═" * 40 + "╝")
-                print()
+                menu.create_info_window("RECORDING MODE", "Preparing to record...", 40)
                 
                 recorder.start_recording()
                 
                 if recorder.events:
-                    print()
-                    print("╔" + "═" * 50 + "╗")
-                    print("║" + "  SAVE RECORDING".center(50) + "║")
-                    print("╚" + "═" * 50 + "╝")
-                    print()
+                    menu.create_info_window("SAVE RECORDING", "Recording completed successfully!", 50)
                     
                     # Ask for filename to save
                     while True:
@@ -450,11 +469,7 @@ def main() -> None:
             
             elif choice == '1':
                 # Replay mode
-                clear_terminal()
-                print("╔" + "═" * 50 + "╗")
-                print("║" + "  LOAD AND REPLAY RECORDING".center(50) + "║")
-                print("╚" + "═" * 50 + "╝")
-                print()
+                menu.create_info_window("LOAD AND REPLAY RECORDING", "Select a recording to replay", 50)
                 
                 while True:
                     # Show available recordings
@@ -485,39 +500,18 @@ def main() -> None:
             
             elif choice == '2':
                 # Exit application
-                clear_terminal()
-                print("╔" + "═" * 40 + "╗")
-                print("║" + "  GOODBYE!".center(40) + "║")
-                print("║" + " " * 40 + "║")
-                print("║" + "  Thank you for using".center(40) + "║")
-                print("║" + "  Mouse and Keyboard Replayer!".center(40) + "║")
-                print("╚" + "═" * 40 + "╝")
+                menu.create_goodbye_window()
                 break
             
             else:
-                clear_terminal()
-                print("╔" + "═" * 35 + "╗")
-                print("║" + "  INVALID CHOICE!".center(35) + "║")
-                print("║" + " " * 35 + "║")
-                print("║" + "  Please enter 0, 1, or 2".center(35) + "║")
-                print("╚" + "═" * 35 + "╝")
-                print()
+                menu.create_error_window("Invalid choice! Please enter 0, 1, or 2")
                 input("Press ENTER to continue...")
         
         except KeyboardInterrupt:
-            clear_terminal()
-            print("╔" + "═" * 40 + "╗")
-            print("║" + "  APPLICATION INTERRUPTED".center(40) + "║")
-            print("╚" + "═" * 40 + "╝")
+            menu.create_info_window("APPLICATION INTERRUPTED", "Program was interrupted by user", 40)
             break
         except Exception as e:
-            clear_terminal()
-            print("╔" + "═" * 45 + "╗")
-            print("║" + "  ERROR OCCURRED".center(45) + "║")
-            print("║" + " " * 45 + "║")
-            print("║" + f"  {str(e)[:41]}".ljust(45) + "║")
-            print("╚" + "═" * 45 + "╝")
-            print()
+            menu.create_error_window(str(e))
             input("Press ENTER to continue...")
 
 
