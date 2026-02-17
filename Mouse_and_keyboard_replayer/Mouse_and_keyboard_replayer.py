@@ -6,6 +6,7 @@ save them to a JSON file, and replay them in a loop until stopped.
 
 Features:
 - Records left, right, and middle mouse button clicks with coordinates
+- Records mouse movement for realistic pointer paths and drag operations
 - Records mouse wheel scroll events with direction and intensity
 - Records all keyboard keystrokes
 - Saves recordings to JSON files
@@ -22,7 +23,7 @@ import json
 import time
 import os
 import sys
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from threading import Event
 from pynput import mouse, keyboard
 from pynput.mouse import Button
@@ -45,6 +46,10 @@ class MouseKeyboardRecorder:
         self.replaying: bool = False
         self.stop_event: Event = Event()
         self.start_time: float = 0.0
+        self.last_move_time: float = 0.0
+        self.last_move_position: Optional[Tuple[int, int]] = None
+        self.move_record_interval: float = 0.01
+        self.move_min_distance: int = 1
     
     def reset_recording(self) -> None:
         """Reset the recording state and clear events."""
@@ -52,6 +57,39 @@ class MouseKeyboardRecorder:
         self.recording = False
         self.stop_event.clear()
         self.start_time = 0.0
+        self.last_move_time = 0.0
+        self.last_move_position = None
+
+    def on_mouse_move(self, x: int, y: int) -> None:
+        """
+        Handle mouse movement events during recording.
+
+        Arguments:
+            x: Current mouse X coordinate
+            y: Current mouse Y coordinate
+        """
+        if not self.recording:
+            return
+
+        current_time = time.time()
+        elapsed = current_time - self.start_time
+
+        if self.last_move_position is not None:
+            last_x, last_y = self.last_move_position
+            distance = abs(x - last_x) + abs(y - last_y)
+            if distance < self.move_min_distance and (current_time - self.last_move_time) < self.move_record_interval:
+                return
+
+        event = {
+            'type': 'mouse',
+            'action': 'move',
+            'x': x,
+            'y': y,
+            'timestamp': elapsed
+        }
+        self.events.append(event)
+        self.last_move_time = current_time
+        self.last_move_position = (x, y)
     
     def on_mouse_click(self, x: int, y: int, button: Button, pressed: bool) -> None:
         """
@@ -195,6 +233,7 @@ class MouseKeyboardRecorder:
         
         # Start listeners
         mouse_listener = mouse.Listener(
+            on_move=self.on_mouse_move,
             on_click=self.on_mouse_click,
             on_scroll=self.on_mouse_scroll
         )
@@ -377,7 +416,9 @@ class MouseKeyboardRecorder:
                     
                     # Execute the event
                     if event['type'] == 'mouse':
-                        if event['action'] == 'press':
+                        if event['action'] == 'move':
+                            mouse_controller.position = (event['x'], event['y'])
+                        elif event['action'] == 'press':
                             mouse_controller.position = (event['x'], event['y'])
                             button = Button.left if event['button'] == 'left' else \
                                    Button.right if event['button'] == 'right' else Button.middle
@@ -434,7 +475,7 @@ def main() -> None:
             # Display main menu
             menu.create_simple_menu([
                 "CENTER:MOUSE AND KEYBOARD REPLAYER",
-                "CENTER:Record and replay mouse clicks, wheel scrolls, and keyboard events",
+                "CENTER:Record and replay mouse movement, clicks, wheel scrolls, and keyboard events",
                 [
                     "LEFT:OPTIONS:,"
                     "LEFT:[0] + ENTER --> Start Recording,"
