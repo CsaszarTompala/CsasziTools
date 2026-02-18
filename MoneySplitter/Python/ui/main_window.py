@@ -20,9 +20,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
+from PyQt5.QtGui import QBrush, QColor, QFont, QIcon, QPixmap
 
-from constants import (
+from logic.constants import (
     APP_NAME,
     BRAND,
     DEFAULT_BG,
@@ -30,16 +30,16 @@ from constants import (
     VERSION,
     get_currency_color,
 )
-from models import CellData, TripData
-from dialogs import (
+from data.models import CellData, TripData
+from ui.dialogs import (
     AddPersonDialog,
     CellEditorDialog,
     ConversionRateDialog,
     ManageCurrenciesDialog,
     RemovePersonDialog,
 )
-from calculator import calculate_balances
-from persistence import load_trip, save_trip
+from logic.calculator import calculate_balances
+from data.persistence import load_trip, save_trip
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
     # ==================================================================
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{BRAND} — {APP_NAME}  v{VERSION}")
+        self._set_window_icon()
         self.setMinimumSize(850, 620)
         self.resize(1050, 720)
 
@@ -183,6 +184,24 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Ready — no file loaded")
 
     # ------------------------------------------------------------------
+    def _set_window_icon(self) -> None:
+        """Set the window icon from logo_MS.png (works for dev and PyInstaller)."""
+        import os
+        import sys
+
+        if getattr(sys, "frozen", False):
+            base = sys._MEIPASS  # type: ignore[attr-defined]
+        else:
+            base = os.path.dirname(os.path.abspath(__file__))
+
+        icon_path = os.path.join(base, "logo_MS.png")
+        if os.path.isfile(icon_path):
+            pixmap = QPixmap(icon_path)
+            icon = QIcon()
+            icon.addPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.setWindowIcon(icon)
+
+    # ------------------------------------------------------------------
     def _build_menu_bar(self) -> None:
         mb = self.menuBar()
         fm = mb.addMenu("File")
@@ -247,12 +266,16 @@ class MainWindow(QMainWindow):
     def _on_expense_ctx_menu(self, pos) -> None:
         menu = QMenu(self)
 
+        # "Edit Cell" — only when exactly one cell is selected
+        selected = self.expense_table.selectedIndexes()
+        edit_action = None
+        if len(selected) == 1:
+            edit_action = menu.addAction("Edit Cell")
+
         add_action = menu.addAction("Add Row")
 
         # Collect selected rows (any cell in the row counts)
-        selected_rows = {
-            idx.row() for idx in self.expense_table.selectedIndexes()
-        }
+        selected_rows = {idx.row() for idx in selected}
 
         del_action = None
         if selected_rows:
@@ -265,7 +288,10 @@ class MainWindow(QMainWindow):
             self.expense_table.viewport().mapToGlobal(pos)
         )
 
-        if action == add_action:
+        if edit_action and action == edit_action:
+            idx = selected[0]
+            self._on_cell_dbl_click(idx.row(), idx.column())
+        elif action == add_action:
             self.trip.add_row()
             self._refresh_expense_table()
         elif del_action and action == del_action:

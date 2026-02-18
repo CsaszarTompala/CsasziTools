@@ -1,7 +1,7 @@
 """Balance-calculation logic for the Money Splitter application."""
 
 from typing import Dict, List
-from models import TripData
+from data.models import TripData
 
 
 def convert_amount(

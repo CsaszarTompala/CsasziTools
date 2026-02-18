@@ -18,8 +18,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-from constants import DEFAULT_BASE_CURRENCY
-from models import CellData
+from logic.constants import DEFAULT_BASE_CURRENCY
+from data.models import CellData
 
 
 # ======================================================================
@@ -157,6 +157,16 @@ class CellEditorDialog(QDialog):
         scroll.setWidget(inner)
         group_layout = QVBoxLayout()
         group_layout.addWidget(scroll)
+
+        sel_btn_row = QHBoxLayout()
+        sel_all_btn = QPushButton("Select All")
+        sel_all_btn.clicked.connect(self._on_select_all)
+        sel_none_btn = QPushButton("Select None")
+        sel_none_btn.clicked.connect(self._on_select_none)
+        sel_btn_row.addWidget(sel_all_btn)
+        sel_btn_row.addWidget(sel_none_btn)
+        group_layout.addLayout(sel_btn_row)
+
         people_group.setLayout(group_layout)
         layout.addWidget(people_group)
 
@@ -198,6 +208,14 @@ class CellEditorDialog(QDialog):
     def _on_clear(self):
         self.result = CellData(checked_people=list(self.all_people))
         self.accept()
+
+    def _on_select_all(self):
+        for cb in self.checkboxes.values():
+            cb.setChecked(True)
+
+    def _on_select_none(self):
+        for cb in self.checkboxes.values():
+            cb.setChecked(False)
 
 
 # ======================================================================

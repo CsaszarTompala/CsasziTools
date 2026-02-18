@@ -73,17 +73,25 @@ The resulting `MoneySplitter.exe` appears in the `dist/` folder.
 
 ```
 MoneySplitter/Python/
-├── main.py            # Entry point
-├── main_window.py     # Main window UI
-├── dialogs.py         # Pop-up dialogs (add/remove person, cell editor, rates, currency management)
-├── models.py          # Data models (CellData, TripData)
-├── calculator.py      # Balance calculation logic
-├── persistence.py     # JSON save/load
-├── constants.py       # App-wide constants, defaults, and colour palette
-├── requirements.txt   # Python dependencies
-├── run.bat            # Quick launcher
-├── build_exe.bat      # PyInstaller build script
-└── README.md          # This file
+├── main.py              # Entry point
+├── logo_MS.png          # Application icon / logo
+├── ui/                  # Frontend — GUI layer
+│   ├── __init__.py
+│   ├── main_window.py   # Main window UI
+│   └── dialogs.py       # Pop-up dialogs (add/remove person, cell editor, rates, currency management)
+├── logic/               # Middle layer — business logic
+│   ├── __init__.py
+│   ├── calculator.py    # Balance calculation & currency conversion
+│   └── constants.py     # App-wide constants, defaults, and colour palette
+├── data/                # Backend — data models & persistence
+│   ├── __init__.py
+│   ├── models.py        # Data models (CellData, TripData)
+│   └── persistence.py   # JSON save/load
+├── json_saves/          # User-saved trip files
+├── requirements.txt     # Python dependencies
+├── run.bat              # Quick launcher
+├── build_exe.bat        # PyInstaller build script
+└── README.md            # This file
 ```
 
 ## Version

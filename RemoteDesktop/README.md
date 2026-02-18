@@ -161,7 +161,6 @@ RemoteDesktop/
 ├── run_gui.bat                # GUI launcher
 ├── build_exe.bat              # PyInstaller build script
 ├── RemoteDesktopConnector.spec # PyInstaller spec file
-├── rdp_icon.ico               # Application icon
 │
 └── Connection Shortcuts:
     ├── connect_to_Luke.bat

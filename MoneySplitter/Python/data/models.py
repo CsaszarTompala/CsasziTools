@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from constants import (
+from logic.constants import (
     DEFAULT_BASE_CURRENCY,
     DEFAULT_CONVERSION_RATES,
     DEFAULT_CURRENCIES,

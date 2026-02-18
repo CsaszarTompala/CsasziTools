@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from models import TripData
+from data.models import TripData
 
 
 def save_trip(trip: TripData, filepath: str) -> bool:

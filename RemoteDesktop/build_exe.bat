@@ -24,15 +24,9 @@ REM Build the executable
 REM --onefile: Create a single executable file
 REM --windowed: No console window (GUI application)
 REM --name: Name of the output executable
-REM --icon: Optional icon (place rdp_icon.ico in this folder)
 REM --add-data: Include the connections.json if it exists
 
-set ICON_PARAM=
-if exist "%~dp0rdp_icon.ico" (
-    set ICON_PARAM=--icon "%~dp0rdp_icon.ico"
-)
-
-pyinstaller --noconfirm --clean --onefile --windowed --name "RemoteDesktopConnector" %ICON_PARAM% "%~dp0remote_desktop_gui.py"
+pyinstaller --noconfirm --clean --onefile --windowed --name "RemoteDesktopConnector" "%~dp0remote_desktop_gui.py"
 
 echo.
 if exist "dist\RemoteDesktopConnector.exe" (
