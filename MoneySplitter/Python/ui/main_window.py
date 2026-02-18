@@ -236,21 +236,15 @@ class MainWindow(QMainWindow):
         hdr_layout.setAlignment(Qt.AlignCenter)
         hdr_layout.setSpacing(2)
 
-        ms_path = self._resolve_logo("logo_MS.png")
-        if ms_path:
-            ms_lbl = QLabel()
-            ms_lbl.setAlignment(Qt.AlignCenter)
-            ms_pm = QPixmap(ms_path).scaled(
-                72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        logo_path = self._resolve_logo("MoneySplitter_logo.png")
+        if logo_path:
+            logo_lbl = QLabel()
+            logo_lbl.setAlignment(Qt.AlignCenter)
+            logo_pm = QPixmap(logo_path).scaled(
+                280, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-            ms_lbl.setPixmap(ms_pm)
-            hdr_layout.addWidget(ms_lbl)
-
-        title_lbl = QLabel(APP_NAME)
-        title_lbl.setFont(QFont("Segoe UI", 10))
-        title_lbl.setAlignment(Qt.AlignCenter)
-        title_lbl.setStyleSheet(f"color: {DRACULA_FG};")
-        hdr_layout.addWidget(title_lbl)
+            logo_lbl.setPixmap(logo_pm)
+            hdr_layout.addWidget(logo_lbl)
 
         ver_lbl = QLabel(f"v{VERSION}")
         ver_lbl.setFont(QFont("Segoe UI", 8))
