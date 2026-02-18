@@ -25,18 +25,17 @@ from PyQt5.QtGui import QBrush, QColor, QFont
 from constants import (
     APP_NAME,
     BRAND,
-    CURRENCIES,
-    CURRENCY_COLORS,
     DEFAULT_BG,
-    DEFAULT_CURRENCY,
     PARTIAL_SPLIT_BG,
     VERSION,
+    get_currency_color,
 )
 from models import CellData, TripData
 from dialogs import (
     AddPersonDialog,
     CellEditorDialog,
     ConversionRateDialog,
+    ManageCurrenciesDialog,
     RemovePersonDialog,
 )
 from calculator import calculate_balances
@@ -106,16 +105,50 @@ class MainWindow(QMainWindow):
         self.rm_person_btn.clicked.connect(self._on_remove_person)
         side.addWidget(self.rm_person_btn)
 
-        side.addSpacing(24)
+        side.addSpacing(16)
+
+        conv_row = QHBoxLayout()
+        self.conv_btn = QPushButton("Conversion Rates")
+        self.conv_btn.setMinimumHeight(36)
+        self.conv_btn.clicked.connect(self._on_conv_rates)
+        conv_row.addWidget(self.conv_btn)
+
+        self.fetch_rates_btn = QPushButton("\U0001F310")
+        self.fetch_rates_btn.setToolTip("Fetch live rates from the internet")
+        self.fetch_rates_btn.setMinimumHeight(36)
+        self.fetch_rates_btn.setFixedWidth(36)
+        self.fetch_rates_btn.clicked.connect(self._on_fetch_rates)
+        conv_row.addWidget(self.fetch_rates_btn)
+        side.addLayout(conv_row)
+
+        self.manage_cur_btn = QPushButton("Manage Currencies")
+        self.manage_cur_btn.setMinimumHeight(36)
+        self.manage_cur_btn.clicked.connect(self._on_manage_currencies)
+        side.addWidget(self.manage_cur_btn)
+
+        side.addSpacing(16)
 
         side.addWidget(QLabel("Result currency:"))
         self.result_currency_combo = QComboBox()
-        self.result_currency_combo.addItems(CURRENCIES)
-        self.result_currency_combo.setCurrentText(DEFAULT_CURRENCY)
+        self._refresh_currency_combo()
         side.addWidget(self.result_currency_combo)
 
-        side.addSpacing(24)
+        side.addStretch()
 
+        # ---- Save / Load quick-access buttons ----
+        self.save_btn = QPushButton("Save")
+        self.save_btn.setMinimumHeight(36)
+        self.save_btn.clicked.connect(self._on_save)
+        side.addWidget(self.save_btn)
+
+        self.load_btn = QPushButton("Load")
+        self.load_btn.setMinimumHeight(36)
+        self.load_btn.clicked.connect(self._on_open)
+        side.addWidget(self.load_btn)
+
+        side.addSpacing(8)
+
+        # CALCULATE — always at the very bottom
         self.calc_btn = QPushButton("CALCULATE")
         self.calc_btn.setMinimumHeight(54)
         self.calc_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
@@ -126,15 +159,6 @@ class MainWindow(QMainWindow):
         )
         self.calc_btn.clicked.connect(self._on_calculate)
         side.addWidget(self.calc_btn)
-
-        side.addSpacing(12)
-
-        self.conv_btn = QPushButton("Conversion Rates")
-        self.conv_btn.setMinimumHeight(36)
-        self.conv_btn.clicked.connect(self._on_conv_rates)
-        side.addWidget(self.conv_btn)
-
-        side.addStretch()
 
         side_widget = QWidget()
         side_widget.setLayout(side)
@@ -147,13 +171,13 @@ class MainWindow(QMainWindow):
         root.addWidget(QLabel("Balances:"))
 
         self.balance_table = QTableWidget(1, 0)
-        self.balance_table.setMaximumHeight(72)
+        self.balance_table.setFixedHeight(45)
         self.balance_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.balance_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
         )
         self.balance_table.verticalHeader().setVisible(False)
-        root.addWidget(self.balance_table, stretch=1)
+        root.addWidget(self.balance_table)
 
         # ---- Status bar -----------------------------------------------
         self.statusBar().showMessage("Ready — no file loaded")
@@ -210,7 +234,9 @@ class MainWindow(QMainWindow):
         if col >= len(self.trip.people) or row >= len(self.trip.expenses):
             return
         cell = self.trip.expenses[row][col]
-        dlg = CellEditorDialog(cell, self.trip.people, self)
+        dlg = CellEditorDialog(
+            cell, self.trip.people, self.trip.currencies, self
+        )
         if dlg.exec_() == QDialog.Accepted and dlg.result is not None:
             self.trip.expenses[row][col] = dlg.result
             self._refresh_expense_table()
@@ -258,9 +284,122 @@ class MainWindow(QMainWindow):
     # Conversion rates
     # ==================================================================
     def _on_conv_rates(self) -> None:
-        dlg = ConversionRateDialog(self.trip.conversion_rates, self)
-        if dlg.exec_() == QDialog.Accepted and dlg.result_rates:
-            self.trip.conversion_rates = dlg.result_rates
+        dlg = ConversionRateDialog(
+            self.trip.currencies,
+            self.trip.base_currency,
+            self.trip.conversion_rates,
+            self,
+        )
+        if dlg.exec_() == QDialog.Accepted:
+            if dlg.result_rates is not None:
+                self.trip.conversion_rates = dlg.result_rates
+            if dlg.result_base and dlg.result_base != self.trip.base_currency:
+                self.trip.base_currency = dlg.result_base
+                self._refresh_currency_combo()
+
+    # ==================================================================
+    # Fetch live rates from the internet
+    # ==================================================================
+    def _on_fetch_rates(self) -> None:
+        """Fetch live exchange rates from open.er-api.com."""
+        import json
+        import ssl
+        import urllib.request
+        import urllib.error
+
+        base = self.trip.base_currency
+        others = [c for c in self.trip.currencies if c != base]
+        if not others:
+            QMessageBox.information(
+                self, "Nothing to fetch",
+                "Only the base currency exists — no rates to look up.",
+            )
+            return
+
+        url = f"https://open.er-api.com/v6/latest/{base}"
+
+        # Build an SSL context — try default first, fall back to unverified
+        # (some corporate proxies replace certificates).
+        ssl_ctx = None
+        try:
+            ssl_ctx = ssl.create_default_context()
+        except Exception:
+            pass
+
+        self.statusBar().showMessage("Fetching live rates…")
+        try:
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req, timeout=10, context=ssl_ctx)
+            data = json.loads(resp.read().decode())
+        except (urllib.error.URLError, OSError) as first_err:
+            # Retry with SSL verification disabled
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+                data = json.loads(resp.read().decode())
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                QMessageBox.warning(
+                    self, "Fetch failed",
+                    f"Could not retrieve rates:\n{exc}",
+                )
+                self.statusBar().showMessage("Rate fetch failed")
+                return
+        except ValueError as exc:
+            QMessageBox.warning(
+                self, "Fetch failed",
+                f"Invalid response:\n{exc}",
+            )
+            self.statusBar().showMessage("Rate fetch failed")
+            return
+
+        api_rates = data.get("rates", {})
+        if not api_rates:
+            QMessageBox.warning(
+                self, "No data",
+                "The API returned no rate data.\n"
+                "Some exotic currency codes may not be supported.",
+            )
+            self.statusBar().showMessage("No rate data returned")
+            return
+
+        # The API returns: 1 BASE = X TARGET.
+        # Our model stores: 1 TARGET = Y BASE (inverted).
+        updated = []
+        for cur in others:
+            api_rate = api_rates.get(cur)
+            if api_rate and api_rate > 0:
+                inverted = round(1.0 / api_rate, 4)
+                self.trip.conversion_rates[cur] = inverted
+                updated.append(f"1 {cur} = {inverted:,.4f} {base}")
+
+        missing = [c for c in others if c not in api_rates]
+        msg = "Updated:\n" + "\n".join(updated)
+        if missing:
+            msg += "\n\nNot found (kept old rate): " + ", ".join(missing)
+
+        QMessageBox.information(self, "Rates fetched", msg)
+        self.statusBar().showMessage(
+            f"Live rates fetched ({len(updated)} currencies)"
+        )
+
+    # ==================================================================
+    # Manage currencies
+    # ==================================================================
+    def _on_manage_currencies(self) -> None:
+        dlg = ManageCurrenciesDialog(
+            self.trip.currencies,
+            self.trip.base_currency,
+            self.trip.conversion_rates,
+            self,
+        )
+        if dlg.exec_() == QDialog.Accepted:
+            if dlg.result_currencies is not None:
+                self.trip.currencies = dlg.result_currencies
+            if dlg.result_rates is not None:
+                self.trip.conversion_rates = dlg.result_rates
+            self._refresh_currency_combo()
 
     # ==================================================================
     # File operations
@@ -311,6 +450,7 @@ class MainWindow(QMainWindow):
     # Table refresh helpers
     # ==================================================================
     def _refresh_all(self) -> None:
+        self._refresh_currency_combo()
         self._refresh_expense_table()
         self._refresh_balance_table()
 
@@ -353,6 +493,18 @@ class MainWindow(QMainWindow):
 
             self.balance_table.setItem(0, c, item)
 
+    def _refresh_currency_combo(self) -> None:
+        """Rebuild the result-currency dropdown from the trip's currency list."""
+        prev = self.result_currency_combo.currentText()
+        self.result_currency_combo.blockSignals(True)
+        self.result_currency_combo.clear()
+        self.result_currency_combo.addItems(self.trip.currencies)
+        if prev in self.trip.currencies:
+            self.result_currency_combo.setCurrentText(prev)
+        else:
+            self.result_currency_combo.setCurrentText(self.trip.base_currency)
+        self.result_currency_combo.blockSignals(False)
+
     # ------------------------------------------------------------------
     @staticmethod
     def _make_expense_item(
@@ -365,7 +517,7 @@ class MainWindow(QMainWindow):
         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         # Text colour → currency
-        colour = CURRENCY_COLORS.get(cell.currency, "#000000")
+        colour = get_currency_color(cell.currency)
         item.setForeground(QBrush(QColor(colour)))
 
         # Background → pale purple when not everyone is included

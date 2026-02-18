@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from constants import DEFAULT_CONVERSION_RATES, DEFAULT_CURRENCY, DEFAULT_ROW_COUNT
+from constants import (
+    DEFAULT_BASE_CURRENCY,
+    DEFAULT_CONVERSION_RATES,
+    DEFAULT_CURRENCIES,
+    DEFAULT_ROW_COUNT,
+    VERSION,
+)
 
 
 @dataclass
@@ -13,7 +19,7 @@ class CellData:
     """A single expense cell in the table."""
 
     amount: Optional[float] = None
-    currency: str = DEFAULT_CURRENCY
+    currency: str = DEFAULT_BASE_CURRENCY
     checked_people: List[str] = field(default_factory=list)
 
     # ------------------------------------------------------------------
@@ -35,7 +41,7 @@ class CellData:
         """Deserialise from a plain dict."""
         return cls(
             amount=data.get("amount"),
-            currency=data.get("currency", DEFAULT_CURRENCY),
+            currency=data.get("currency", DEFAULT_BASE_CURRENCY),
             checked_people=data.get("checked_people", []),
         )
 
@@ -46,10 +52,19 @@ class TripData:
 
     people: List[str] = field(default_factory=list)
     expenses: List[List[CellData]] = field(default_factory=list)
+
+    # Dynamic currency configuration
+    currencies: List[str] = field(
+        default_factory=lambda: list(DEFAULT_CURRENCIES)
+    )
+    base_currency: str = DEFAULT_BASE_CURRENCY
+
+    # conversion_rates maps *non-base* currency → how many base-currency
+    # units equal 1 unit of that currency.
     conversion_rates: Dict[str, float] = field(
         default_factory=lambda: dict(DEFAULT_CONVERSION_RATES)
     )
-    result_currency: str = DEFAULT_CURRENCY
+    result_currency: str = DEFAULT_BASE_CURRENCY
 
     # ------------------------------------------------------------------
     # Person management
@@ -103,11 +118,13 @@ class TripData:
     # ------------------------------------------------------------------
     def to_dict(self) -> dict:
         return {
-            "version": VERSION_TAG,
+            "version": VERSION,
             "people": list(self.people),
             "expenses": [
                 [cell.to_dict() for cell in row] for row in self.expenses
             ],
+            "currencies": list(self.currencies),
+            "base_currency": self.base_currency,
             "conversion_rates": dict(self.conversion_rates),
             "result_currency": self.result_currency,
         }
@@ -120,11 +137,60 @@ class TripData:
             [CellData.from_dict(c) for c in row]
             for row in data.get("expenses", [])
         ]
+        trip.currencies = data.get("currencies", list(DEFAULT_CURRENCIES))
+        trip.base_currency = data.get("base_currency", DEFAULT_BASE_CURRENCY)
         trip.conversion_rates = data.get(
             "conversion_rates", dict(DEFAULT_CONVERSION_RATES)
         )
-        trip.result_currency = data.get("result_currency", DEFAULT_CURRENCY)
+        trip.result_currency = data.get("result_currency", DEFAULT_BASE_CURRENCY)
         return trip
+
+    # ------------------------------------------------------------------
+    # Currency management helpers
+    # ------------------------------------------------------------------
+    def add_currency(self, code: str, rate_to_base: float) -> None:
+        """Register a new currency with its rate relative to base."""
+        code = code.upper().strip()
+        if code in self.currencies:
+            return
+        self.currencies.append(code)
+        if code != self.base_currency:
+            self.conversion_rates[code] = rate_to_base
+
+    def remove_currency(self, code: str) -> None:
+        """Remove a currency (cannot remove the base currency)."""
+        if code == self.base_currency or code not in self.currencies:
+            return
+        self.currencies.remove(code)
+        self.conversion_rates.pop(code, None)
+
+    def change_base_currency(self, new_base: str) -> None:
+        """Switch the base currency and recalculate all rates.
+
+        Old rates: ``old_rate[X] = base_old per 1 X``
+        New base rate of old base: ``rate[old_base] = 1 / old_rate[new_base]``
+        New rate of any other X: ``rate[X] = old_rate[X] / old_rate[new_base]``
+        """
+        if new_base == self.base_currency:
+            return
+        if new_base not in self.currencies:
+            return
+
+        old_base = self.base_currency
+        pivot = self.conversion_rates.get(new_base, 1.0)
+
+        new_rates: Dict[str, float] = {}
+        for cur in self.currencies:
+            if cur == new_base:
+                continue
+            if cur == old_base:
+                new_rates[cur] = 1.0 / pivot if pivot else 1.0
+            else:
+                old_rate = self.conversion_rates.get(cur, 1.0)
+                new_rates[cur] = old_rate / pivot if pivot else old_rate
+
+        self.base_currency = new_base
+        self.conversion_rates = new_rates
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -132,6 +198,3 @@ class TripData:
     def _append_empty_row(self) -> None:
         row = [CellData(checked_people=list(self.people)) for _ in self.people]
         self.expenses.append(row)
-
-
-VERSION_TAG = "0.0.1"

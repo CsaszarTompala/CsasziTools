@@ -8,29 +8,31 @@ def convert_amount(
     amount: float,
     from_currency: str,
     to_currency: str,
+    base_currency: str,
     conversion_rates: Dict[str, float],
 ) -> float:
-    """Convert *amount* between currencies via HUF as the pivot.
+    """Convert *amount* between currencies via the trip's base currency as pivot.
 
-    *conversion_rates* maps a foreign currency code to its HUF equivalent
-    (e.g. ``{"USD": 380, "EUR": 410}``).
+    *conversion_rates* maps a non-base currency code to its base-currency
+    equivalent (e.g. ``{"USD": 380, "EUR": 410}`` when base is HUF).
+    The base currency itself is always implicitly 1.0.
     """
     if from_currency == to_currency:
         return amount
 
-    # Step 1 – to HUF
-    if from_currency == "HUF":
-        amount_huf = amount
+    # Step 1 – to base currency
+    if from_currency == base_currency:
+        amount_base = amount
     else:
         rate = conversion_rates.get(from_currency, 1.0)
-        amount_huf = amount * rate
+        amount_base = amount * rate
 
-    # Step 2 – from HUF to target
-    if to_currency == "HUF":
-        return amount_huf
+    # Step 2 – from base currency to target
+    if to_currency == base_currency:
+        return amount_base
 
     rate = conversion_rates.get(to_currency, 1.0)
-    return amount_huf / rate if rate != 0 else 0.0
+    return amount_base / rate if rate != 0 else 0.0
 
 
 def calculate_balances(trip: TripData) -> Dict[str, float]:
@@ -54,6 +56,7 @@ def calculate_balances(trip: TripData) -> Dict[str, float]:
                 cell.amount,
                 cell.currency,
                 trip.result_currency,
+                trip.base_currency,
                 trip.conversion_rates,
             )
 

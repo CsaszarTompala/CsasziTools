@@ -1,0 +1,466 @@
+{
+  "version": "0.0.2",
+  "people": [
+    "Zsofi",
+    "Tomi",
+    "Balazs",
+    "Akos",
+    "Blanka",
+    "Zsolti"
+  ],
+  "expenses": [
+    [
+      {
+        "amount": 15000.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 5000.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi"
+        ]
+      },
+      {
+        "amount": 12500.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 9600.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 50.4,
+        "currency": "EUR",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 102.0,
+        "currency": "USD",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ],
+    [
+      {
+        "amount": 65440.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 12000.0,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 32.6,
+        "currency": "EUR",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": 64.0,
+        "currency": "USD",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ],
+    [
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ],
+    [
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ],
+    [
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ],
+    [
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      },
+      {
+        "amount": null,
+        "currency": "HUF",
+        "checked_people": [
+          "Zsofi",
+          "Tomi",
+          "Balazs",
+          "Akos",
+          "Blanka",
+          "Zsolti"
+        ]
+      }
+    ]
+  ],
+  "currencies": [
+    "HUF",
+    "EUR",
+    "USD",
+    "NOK"
+  ],
+  "base_currency": "HUF",
+  "conversion_rates": {
+    "EUR": 386.0396,
+    "USD": 328.033,
+    "NOK": 33.0033
+  },
+  "result_currency": "HUF"
+}

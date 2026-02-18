@@ -6,11 +6,13 @@ A PyQt5 desktop application for splitting shared expenses on trips — similar t
 
 - Add / remove people dynamically
 - Excel-like expense table with right-click row management
-- Per-cell configuration: amount, currency (HUF / EUR / USD), and people-split
-- Visual indicators: text colour by currency, pale-purple background for partial splits
-- One-click balance calculation with currency conversion
-- Editable HUF-based conversion rates for USD and EUR
-- Save / load trip data as JSON
+- Per-cell configuration: amount, currency, and people-split
+- **Fully dynamic currencies** — add, remove, and configure currencies at runtime
+- **Configurable base currency** with automatic rate recalculation when switching
+- Visual indicators: text colour by currency (auto-assigned palette), pale-purple background for partial splits
+- One-click balance calculation with currency conversion via any base-currency pivot
+- **Fetch live exchange rates** from the internet (🌐 button) — powered by open.er-api.com
+- Save / Load buttons on the side panel plus File menu shortcuts (Ctrl+S / Ctrl+O)
 - Buildable to a standalone `.exe` via PyInstaller
 
 ## Requirements
@@ -41,17 +43,21 @@ run.bat
 1. **Add people** — click *Add Person* on the right panel.
 2. **Enter expenses** — double-click any cell to set the amount, currency, and who the expense is split among.
 3. **Manage rows** — right-click the table to add a row. Select row(s) on the left header and right-click to delete.
-4. **Set conversion rates** — click *Conversion Rates* to define HUF per USD / EUR.
-5. **Calculate** — pick the result currency in the dropdown and press **CALCULATE**. Balances appear in the bottom table.
-6. **Save / Load** — use *File → Save / Open* (Ctrl+S / Ctrl+O) to persist trip data as JSON.
+4. **Manage currencies** — click *Manage Currencies* to add / remove currencies with their conversion rate to the base currency.
+5. **Set conversion rates** — click *Conversion Rates* to edit rates and optionally switch the base currency (rates recalculate automatically).
+6. **Calculate** — pick the result currency in the dropdown and press **CALCULATE**. Balances appear in the compact bottom table.
+7. **Save / Load** — use the *Save* / *Load* buttons on the side panel, or *File → Save / Open* (Ctrl+S / Ctrl+O).
 
 ## Cell colour scheme
 
-| Currency | Text colour |
-|----------|-------------|
-| HUF      | Black       |
-| EUR      | Blue        |
-| USD      | Green       |
+Currencies are coloured automatically from a repeating palette:
+
+| Index | Colour  | Default currency |
+|-------|---------|------------------|
+| 0     | Black   | HUF              |
+| 1     | Blue    | EUR              |
+| 2     | Green   | USD              |
+| 3+    | Orange, Purple, Magenta, Teal, Brown … | user-added |
 
 Cells where the expense is **not** split among everyone get a **pale purple** background.
 
@@ -69,11 +75,11 @@ The resulting `MoneySplitter.exe` appears in the `dist/` folder.
 MoneySplitter/Python/
 ├── main.py            # Entry point
 ├── main_window.py     # Main window UI
-├── dialogs.py         # Pop-up dialogs (add/remove person, cell editor, rates)
+├── dialogs.py         # Pop-up dialogs (add/remove person, cell editor, rates, currency management)
 ├── models.py          # Data models (CellData, TripData)
 ├── calculator.py      # Balance calculation logic
 ├── persistence.py     # JSON save/load
-├── constants.py       # App-wide constants and defaults
+├── constants.py       # App-wide constants, defaults, and colour palette
 ├── requirements.txt   # Python dependencies
 ├── run.bat            # Quick launcher
 ├── build_exe.bat      # PyInstaller build script
@@ -82,4 +88,4 @@ MoneySplitter/Python/
 
 ## Version
 
-0.0.1
+0.0.2
