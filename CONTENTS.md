@@ -4,6 +4,7 @@
 
 - [Common](Common)
 - [Mini_projects](Mini_projects)
+- [MoneySplitter](MoneySplitter)
 - [Mouse_and_keyboard_replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)
@@ -11,7 +12,8 @@
 ## Tool README links
 
 - [Common Menu System README](Common/Menu/README.md)
-- [Unix Timestamper README](Mini_projects/Unix_timestamper/README.md)
+- [Mini_projects / Unix Timestamper README](Mini_projects/Unix_timestamper/README.md)
+- [Money Splitter README](MoneySplitter/Python/README.md)
 - [Mouse and Keyboard Replayer README](Mouse_and_keyboard_replayer/README.md)
 - [OpenJenkins README](OpenJenkins/README.md)
 - [RemoteDesktop README](RemoteDesktop/README.md)
@@ -28,6 +30,7 @@
 - [Unix Timestamper feature documentation](Mini_projects/Unix_timestamper/FEATURE_DOCUMENTATION.md)
 
 ### Standalone tools
+- [Money Splitter](MoneySplitter/Python) — PyQt5 trip-expense splitter
 - [Mouse and Keyboard Replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)

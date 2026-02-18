@@ -18,6 +18,7 @@ For every code or file change in this repository:
 - Changes under `Mini_projects/Unix_timestamper/` -> review `Mini_projects/Unix_timestamper/README.md` and `CONTENTS.md`
 - Changes under `Mouse_and_keyboard_replayer/` -> review `Mouse_and_keyboard_replayer/README.md` and `CONTENTS.md`
 - Changes under `OpenJenkins/` -> review `OpenJenkins/README.md` and `CONTENTS.md`
+- Changes under `MoneySplitter/` -> review `MoneySplitter/Python/README.md` and `CONTENTS.md`
 - Changes under `RemoteDesktop/` -> review `RemoteDesktop/README.md` and `CONTENTS.md`
 
 ## Decision policy
