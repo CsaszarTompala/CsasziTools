@@ -22,6 +22,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QColor, QFont, QIcon, QPixmap
 
+import os
+import sys
+
 from logic.constants import (
     APP_NAME,
     BRAND,
@@ -66,11 +69,43 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
-        # ---- Header ---------------------------------------------------
-        hdr = QLabel(f"{BRAND}  —  {APP_NAME}  v{VERSION}")
-        hdr.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        hdr.setAlignment(Qt.AlignCenter)
-        root.addWidget(hdr)
+        # ---- Header (logos + version) ---------------------------------
+        hdr_layout = QHBoxLayout()
+        hdr_layout.setAlignment(Qt.AlignCenter)
+        hdr_layout.setSpacing(10)
+
+        cst_path = self._resolve_logo("logo_CsT.png")
+        if cst_path:
+            cst_lbl = QLabel()
+            cst_pm = QPixmap(cst_path).scaled(
+                40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            cst_lbl.setPixmap(cst_pm)
+            hdr_layout.addWidget(cst_lbl)
+
+        sep = QLabel("—")
+        sep.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        hdr_layout.addWidget(sep)
+
+        ms_path = self._resolve_logo("logo_MS.png")
+        if ms_path:
+            ms_lbl = QLabel()
+            ms_pm = QPixmap(ms_path).scaled(
+                40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            ms_lbl.setPixmap(ms_pm)
+            hdr_layout.addWidget(ms_lbl)
+
+        title_lbl = QLabel(f"  {APP_NAME}")
+        title_lbl.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        hdr_layout.addWidget(title_lbl)
+
+        ver_lbl = QLabel(f"v{VERSION}")
+        ver_lbl.setFont(QFont("Segoe UI", 10))
+        ver_lbl.setStyleSheet("color: #888;")
+        hdr_layout.addWidget(ver_lbl)
+
+        root.addLayout(hdr_layout)
 
         # ---- Top section: expense table  +  side panel ----------------
         top = QHBoxLayout()
@@ -184,18 +219,35 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Ready — no file loaded")
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _resolve_logo(name: str) -> str | None:
+        """Find a logo file by *name*.  Works in dev and PyInstaller builds."""
+        if getattr(sys, "frozen", False):
+            path = os.path.join(sys._MEIPASS, name)  # type: ignore[attr-defined]
+            return path if os.path.isfile(path) else None
+
+        # Dev mode – __file__ lives in  ui/  so project root is one level up
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )
+        # logo_MS.png lives in project root
+        path = os.path.join(project_root, name)
+        if os.path.isfile(path):
+            return path
+
+        # logo_CsT.png lives in  <repo>/Common/
+        repo_root = os.path.dirname(os.path.dirname(project_root))
+        path = os.path.join(repo_root, "Common", name)
+        if os.path.isfile(path):
+            return path
+
+        return None
+
+    # ------------------------------------------------------------------
     def _set_window_icon(self) -> None:
         """Set the window icon from logo_MS.png (works for dev and PyInstaller)."""
-        import os
-        import sys
-
-        if getattr(sys, "frozen", False):
-            base = sys._MEIPASS  # type: ignore[attr-defined]
-        else:
-            base = os.path.dirname(os.path.abspath(__file__))
-
-        icon_path = os.path.join(base, "logo_MS.png")
-        if os.path.isfile(icon_path):
+        icon_path = self._resolve_logo("logo_MS.png")
+        if icon_path:
             pixmap = QPixmap(icon_path)
             icon = QIcon()
             icon.addPixmap(pixmap.scaled(256, 256, Qt.KeepAspectRatio, Qt.SmoothTransformation))

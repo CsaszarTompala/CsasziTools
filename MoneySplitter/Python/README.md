@@ -12,6 +12,7 @@ A PyQt5 desktop application for splitting shared expenses on trips — similar t
 - Visual indicators: text colour by currency (auto-assigned palette), pale-purple background for partial splits
 - One-click balance calculation with currency conversion via any base-currency pivot
 - **Fetch live exchange rates** from the internet (🌐 button) — powered by open.er-api.com
+- **Branded header** with CsasziTools and MoneySplitter logos plus version display
 - Save / Load buttons on the side panel plus File menu shortcuts (Ctrl+S / Ctrl+O)
 - Buildable to a standalone `.exe` via PyInstaller
 
