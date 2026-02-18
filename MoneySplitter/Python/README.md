@@ -14,6 +14,9 @@ A PyQt5 desktop application for splitting shared expenses on trips — similar t
 - **Fetch live exchange rates** from the internet (🌐 button) — powered by open.er-api.com
 - **Branded header** with MoneySplitter logo and version display
 - **4 colour themes** — Dracula, Monokai, Nord, Solarized Light — selectable from *View → Theme* (remembered across sessions)
+- **Undo / Redo** (Ctrl+Z / Ctrl+Y) — every data change is undoable (up to 50 steps)
+- **Edit menu** — Undo, Redo, Add Row, Delete Selected Rows, Edit Cell, Select All
+- **Help → About** dialog with version info and keyboard-shortcut reference
 - Save / Load buttons on the side panel plus File menu shortcuts (Ctrl+S / Ctrl+O)
 - Buildable to a standalone `.exe` via PyInstaller
 
@@ -44,11 +47,27 @@ run.bat
 
 1. **Add people** — click *Add Person* on the right panel.
 2. **Enter expenses** — double-click any cell to set the amount, currency, and who the expense is split among.
-3. **Manage rows** — right-click the table to add a row. Select row(s) on the left header and right-click to delete.
+3. **Manage rows** — right-click the table to add a row, or use *Edit → Add Row* (Ctrl+Insert). Select row(s) and press Delete or right-click to delete.
 4. **Manage currencies** — click *Manage Currencies* to add / remove currencies with their conversion rate to the base currency.
 5. **Set conversion rates** — click *Conversion Rates* to edit rates and optionally switch the base currency (rates recalculate automatically).
 6. **Calculate** — pick the result currency in the dropdown and press **CALCULATE**. Balances appear in the compact bottom table.
 7. **Save / Load** — use the *Save* / *Load* buttons on the side panel, or *File → Save / Open* (Ctrl+S / Ctrl+O).
+8. **Undo / Redo** — Ctrl+Z to undo, Ctrl+Y to redo. Every data change is recorded.
+
+## Keyboard shortcuts
+
+| Shortcut         | Action                |
+|------------------|-----------------------|
+| Ctrl+N           | New Trip              |
+| Ctrl+O           | Open File             |
+| Ctrl+S           | Save                  |
+| Ctrl+Shift+S     | Save As               |
+| Ctrl+Z           | Undo                  |
+| Ctrl+Y           | Redo                  |
+| Ctrl+Insert      | Add Row               |
+| Delete           | Delete Selected Rows  |
+| Enter            | Edit Cell             |
+| Ctrl+A           | Select All            |
 
 ## Cell colour scheme
 
@@ -87,7 +106,8 @@ MoneySplitter/Python/
 │   ├── __init__.py
 │   ├── calculator.py        # Balance calculation & currency conversion
 │   ├── constants.py         # App-wide constants & theme-aware colour helpers
-│   └── themes.py            # Colour theme definitions, stylesheet & palette builders
+│   ├── themes.py            # Colour theme definitions, stylesheet & palette builders
+│   └── undo_redo.py         # Undo/redo manager (state snapshots)
 ├── data/                    # Backend — data models & persistence
 │   ├── __init__.py
 │   ├── models.py            # Data models (CellData, TripData)
@@ -102,4 +122,4 @@ MoneySplitter/Python/
 
 ## Version
 
-0.0.4
+0.0.5

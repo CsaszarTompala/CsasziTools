@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont, QIcon, QPixmap
+from PyQt5.QtGui import QBrush, QColor, QFont, QIcon, QKeySequence, QPixmap
 
 import os
 import sys
@@ -44,6 +44,7 @@ from logic.themes import (
     get_active_theme,
     set_active_theme,
 )
+from logic.undo_redo import UndoRedoManager
 from data.models import CellData, TripData
 from data.settings import load_theme_name, save_theme_name
 from ui.dialogs import (
@@ -64,7 +65,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.trip = TripData()
         self.current_file: str | None = None
+        self._undo_mgr = UndoRedoManager()
         self._build_ui()
+        self._undo_mgr.clear(self.trip)  # seed initial state
 
     # ==================================================================
     # UI construction
@@ -264,6 +267,27 @@ class MainWindow(QMainWindow):
         fm.addSeparator()
         self._add_action(fm, "Exit", "Alt+F4", self.close)
 
+        # ---- Edit menu ------------------------------------------------
+        em = mb.addMenu("Edit")
+        self._undo_action = self._add_action(
+            em, "Undo", "Ctrl+Z", self._on_undo
+        )
+        self._redo_action = self._add_action(
+            em, "Redo", "Ctrl+Y", self._on_redo
+        )
+        em.addSeparator()
+        self._add_action(em, "Add Row", "Ctrl+Insert", self._on_add_row)
+        self._del_rows_action = self._add_action(
+            em, "Delete Selected Rows", "Delete", self._on_delete_selected_rows
+        )
+        em.addSeparator()
+        self._add_action(em, "Edit Cell", "Return", self._on_edit_selected_cell)
+        em.addSeparator()
+        self._add_action(
+            em, "Select All", "Ctrl+A", self._on_select_all
+        )
+        self._update_undo_redo_state()
+
         # ---- View menu (theme picker) ---------------------------------
         vm = mb.addMenu("View")
         theme_menu = vm.addMenu("Theme")
@@ -279,6 +303,10 @@ class MainWindow(QMainWindow):
             act.triggered.connect(self._on_theme_changed)
             self._theme_action_group.addAction(act)
             theme_menu.addAction(act)
+
+        # ---- Help menu ------------------------------------------------
+        hm = mb.addMenu("Help")
+        self._add_action(hm, "About…", "", self._on_about)
 
     # ------------------------------------------------------------------
     def _apply_theme_styling(self) -> None:
@@ -317,9 +345,11 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _add_action(menu, text, shortcut, slot):
         act = QAction(text, menu)
-        act.setShortcut(shortcut)
+        if shortcut:
+            act.setShortcut(shortcut)
         act.triggered.connect(slot)
         menu.addAction(act)
+        return act
 
     # ==================================================================
     # Row-header click  (select entire row like Excel)
@@ -333,8 +363,10 @@ class MainWindow(QMainWindow):
     def _on_add_person(self) -> None:
         dlg = AddPersonDialog(self.trip.people, self)
         if dlg.exec_() == QDialog.Accepted and dlg.result_name:
+            self._undo_mgr.snapshot(self.trip)
             self.trip.add_person(dlg.result_name)
             self._refresh_all()
+            self._update_undo_redo_state()
 
     def _on_remove_person(self) -> None:
         if not self.trip.people:
@@ -344,8 +376,10 @@ class MainWindow(QMainWindow):
             return
         dlg = RemovePersonDialog(self.trip.people, self)
         if dlg.exec_() == QDialog.Accepted and dlg.result_name:
+            self._undo_mgr.snapshot(self.trip)
             self.trip.remove_person(dlg.result_name)
             self._refresh_all()
+            self._update_undo_redo_state()
 
     # ==================================================================
     # Cell double-click → editor
@@ -358,8 +392,10 @@ class MainWindow(QMainWindow):
             cell, self.trip.people, self.trip.currencies, self
         )
         if dlg.exec_() == QDialog.Accepted and dlg.result is not None:
+            self._undo_mgr.snapshot(self.trip)
             self.trip.expenses[row][col] = dlg.result
             self._refresh_expense_table()
+            self._update_undo_redo_state()
 
     # ==================================================================
     # Context menu (add / delete rows)
@@ -393,11 +429,15 @@ class MainWindow(QMainWindow):
             idx = selected[0]
             self._on_cell_dbl_click(idx.row(), idx.column())
         elif action == add_action:
+            self._undo_mgr.snapshot(self.trip)
             self.trip.add_row()
             self._refresh_expense_table()
+            self._update_undo_redo_state()
         elif del_action and action == del_action:
+            self._undo_mgr.snapshot(self.trip)
             self.trip.remove_rows(list(selected_rows))
             self._refresh_expense_table()
+            self._update_undo_redo_state()
 
     # ==================================================================
     # Calculate
@@ -418,11 +458,13 @@ class MainWindow(QMainWindow):
             self,
         )
         if dlg.exec_() == QDialog.Accepted:
+            self._undo_mgr.snapshot(self.trip)
             if dlg.result_rates is not None:
                 self.trip.conversion_rates = dlg.result_rates
             if dlg.result_base and dlg.result_base != self.trip.base_currency:
                 self.trip.base_currency = dlg.result_base
                 self._refresh_currency_combo()
+            self._update_undo_redo_state()
 
     # ==================================================================
     # Fetch live rates from the internet
@@ -493,6 +535,7 @@ class MainWindow(QMainWindow):
 
         # The API returns: 1 BASE = X TARGET.
         # Our model stores: 1 TARGET = Y BASE (inverted).
+        self._undo_mgr.snapshot(self.trip)
         updated = []
         for cur in others:
             api_rate = api_rates.get(cur)
@@ -510,6 +553,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Live rates fetched ({len(updated)} currencies)"
         )
+        self._update_undo_redo_state()
 
     # ==================================================================
     # Manage currencies
@@ -522,11 +566,13 @@ class MainWindow(QMainWindow):
             self,
         )
         if dlg.exec_() == QDialog.Accepted:
+            self._undo_mgr.snapshot(self.trip)
             if dlg.result_currencies is not None:
                 self.trip.currencies = dlg.result_currencies
             if dlg.result_rates is not None:
                 self.trip.conversion_rates = dlg.result_rates
             self._refresh_currency_combo()
+            self._update_undo_redo_state()
 
     # ==================================================================
     # File operations
@@ -534,7 +580,9 @@ class MainWindow(QMainWindow):
     def _on_new_trip(self) -> None:
         self.trip = TripData()
         self.current_file = None
+        self._undo_mgr.clear(self.trip)
         self._refresh_all()
+        self._update_undo_redo_state()
         self.statusBar().showMessage("New trip created")
 
     def _on_open(self) -> None:
@@ -547,7 +595,9 @@ class MainWindow(QMainWindow):
         if trip:
             self.trip = trip
             self.current_file = path
+            self._undo_mgr.clear(self.trip)
             self._refresh_all()
+            self._update_undo_redo_state()
             self.statusBar().showMessage(f"Loaded: {path}")
         else:
             QMessageBox.critical(self, "Error", f"Failed to load\n{path}")
@@ -655,3 +705,89 @@ class MainWindow(QMainWindow):
                 item.setBackground(QBrush(QColor(default_bg())))
 
         return item
+
+    # ==================================================================
+    # Undo / Redo
+    # ==================================================================
+    def _update_undo_redo_state(self) -> None:
+        """Enable or disable the Undo / Redo menu actions."""
+        self._undo_action.setEnabled(self._undo_mgr.can_undo())
+        self._redo_action.setEnabled(self._undo_mgr.can_redo())
+
+    def _on_undo(self) -> None:
+        restored = self._undo_mgr.undo()
+        if restored is None:
+            return
+        self.trip = restored
+        self._refresh_all()
+        self._update_undo_redo_state()
+        self.statusBar().showMessage("Undo")
+
+    def _on_redo(self) -> None:
+        restored = self._undo_mgr.redo()
+        if restored is None:
+            return
+        self.trip = restored
+        self._refresh_all()
+        self._update_undo_redo_state()
+        self.statusBar().showMessage("Redo")
+
+    # ==================================================================
+    # Edit-menu actions (Add Row, Delete Rows, Edit Cell, Select All)
+    # ==================================================================
+    def _on_add_row(self) -> None:
+        """Add an empty row at the bottom of the expense table."""
+        self._undo_mgr.snapshot(self.trip)
+        self.trip.add_row()
+        self._refresh_expense_table()
+        self._update_undo_redo_state()
+
+    def _on_delete_selected_rows(self) -> None:
+        """Delete all selected rows from the expense table."""
+        selected_rows = {
+            idx.row() for idx in self.expense_table.selectedIndexes()
+        }
+        if not selected_rows:
+            return
+        self._undo_mgr.snapshot(self.trip)
+        self.trip.remove_rows(list(selected_rows))
+        self._refresh_expense_table()
+        self._update_undo_redo_state()
+
+    def _on_edit_selected_cell(self) -> None:
+        """Open the cell editor for the single selected cell."""
+        selected = self.expense_table.selectedIndexes()
+        if len(selected) != 1:
+            return
+        idx = selected[0]
+        self._on_cell_dbl_click(idx.row(), idx.column())
+
+    def _on_select_all(self) -> None:
+        """Select all cells in the expense table."""
+        self.expense_table.selectAll()
+
+    # ==================================================================
+    # Help menu
+    # ==================================================================
+    def _on_about(self) -> None:
+        """Show the About dialog."""
+        QMessageBox.about(
+            self,
+            f"About {APP_NAME}",
+            f"<h3>{BRAND} — {APP_NAME}</h3>"
+            f"<p>Version {VERSION}</p>"
+            f"<p>A trip expense-splitting calculator.</p>"
+            f"<p><b>Keyboard shortcuts:</b></p>"
+            f"<table cellpadding='2'>"
+            f"<tr><td>Ctrl+N</td><td>New Trip</td></tr>"
+            f"<tr><td>Ctrl+O</td><td>Open File</td></tr>"
+            f"<tr><td>Ctrl+S</td><td>Save</td></tr>"
+            f"<tr><td>Ctrl+Shift+S</td><td>Save As</td></tr>"
+            f"<tr><td>Ctrl+Z</td><td>Undo</td></tr>"
+            f"<tr><td>Ctrl+Y</td><td>Redo</td></tr>"
+            f"<tr><td>Ctrl+Insert</td><td>Add Row</td></tr>"
+            f"<tr><td>Delete</td><td>Delete Selected Rows</td></tr>"
+            f"<tr><td>Enter</td><td>Edit Cell</td></tr>"
+            f"<tr><td>Ctrl+A</td><td>Select All</td></tr>"
+            f"</table>",
+        )
