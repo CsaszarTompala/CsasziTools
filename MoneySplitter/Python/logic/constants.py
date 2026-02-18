@@ -1,6 +1,8 @@
 """Constants and configuration for the Money Splitter application."""
 
-VERSION = "0.0.3"
+from __future__ import annotations
+
+VERSION = "0.0.4"
 APP_NAME = "Money Splitter"
 BRAND = "CsasziTools"
 
@@ -20,40 +22,27 @@ DEFAULT_CONVERSION_RATES = {
 DEFAULT_ROW_COUNT = 6
 
 # =====================================================================
-# Dracula colour scheme
+# Theme-aware colour helpers
 # =====================================================================
-DRACULA_BG = "#282a36"
-DRACULA_CURRENT = "#44475a"
-DRACULA_FG = "#f8f8f2"
-DRACULA_COMMENT = "#6272a4"
-DRACULA_CYAN = "#8be9fd"
-DRACULA_GREEN = "#50fa7b"
-DRACULA_ORANGE = "#ffb86c"
-DRACULA_PINK = "#ff79c6"
-DRACULA_PURPLE = "#bd93f9"
-DRACULA_RED = "#ff5555"
-DRACULA_YELLOW = "#f1fa8c"
+# Import *after* the basic constants above to avoid circular deps.
+from logic.themes import get_active_theme, get_currency_palette  # noqa: E402
 
-# ---- Colour palette for currencies (Dracula-friendly) ----------------
-# Bright, legible colours that contrast well against #282a36 / #44475a.
-CURRENCY_COLOR_PALETTE = [
-    DRACULA_FG,       # 0  White/foreground (HUF default — base currency)
-    DRACULA_CYAN,     # 1  Cyan             (EUR default)
-    DRACULA_GREEN,    # 2  Green            (USD default)
-    DRACULA_ORANGE,   # 3  Orange
-    DRACULA_PINK,     # 4  Pink
-    DRACULA_YELLOW,   # 5  Yellow
-    DRACULA_PURPLE,   # 6  Purple
-    DRACULA_RED,      # 7  Red
-]
 
-# Mapping seeded for the built-in currencies; others are assigned at runtime
-# by get_currency_color().
-CURRENCY_COLORS = {
-    "HUF": CURRENCY_COLOR_PALETTE[0],
-    "EUR": CURRENCY_COLOR_PALETTE[1],
-    "USD": CURRENCY_COLOR_PALETTE[2],
-}
+# ---- Currency colour cache (rebuilt on theme change) -----------------
+CURRENCY_COLORS: dict[str, str] = {}
+
+
+def _seed_currency_colors() -> None:
+    """(Re)populate the currency colour cache from the active theme."""
+    palette = get_currency_palette()
+    CURRENCY_COLORS.clear()
+    CURRENCY_COLORS["HUF"] = palette[0]
+    CURRENCY_COLORS["EUR"] = palette[1]
+    CURRENCY_COLORS["USD"] = palette[2]
+
+
+# Seed once at import time
+_seed_currency_colors()
 
 
 def get_currency_color(currency: str) -> str:
@@ -64,16 +53,36 @@ def get_currency_color(currency: str) -> str:
     """
     if currency in CURRENCY_COLORS:
         return CURRENCY_COLORS[currency]
-    idx = len(CURRENCY_COLORS) % len(CURRENCY_COLOR_PALETTE)
-    colour = CURRENCY_COLOR_PALETTE[idx]
+    palette = get_currency_palette()
+    idx = len(CURRENCY_COLORS) % len(palette)
+    colour = palette[idx]
     CURRENCY_COLORS[currency] = colour
     return colour
 
 
-# Background colour when an expense is NOT split among everyone
-PARTIAL_SPLIT_BG = "#3d2f58"    # Muted purple (Dracula accent)
-DEFAULT_BG = DRACULA_BG         # Main background
+def refresh_theme_colors() -> None:
+    """Call after switching themes to re-seed all colour caches."""
+    _seed_currency_colors()
 
-# Balance positive / negative colours
-BALANCE_POSITIVE = DRACULA_GREEN
-BALANCE_NEGATIVE = DRACULA_RED
+
+# ---- Convenience accessors that read from the active theme -----------
+
+def partial_split_bg() -> str:
+    return get_active_theme()["partial_split_bg"]
+
+
+def default_bg() -> str:
+    return get_active_theme()["bg"]
+
+
+def balance_positive() -> str:
+    return get_active_theme()["green"]
+
+
+def balance_negative() -> str:
+    return get_active_theme()["red"]
+
+
+# Legacy aliases (kept for any remaining imports; point to theme values)
+PARTIAL_SPLIT_BG = property(lambda _: partial_split_bg())  # type: ignore
+DEFAULT_BG = property(lambda _: default_bg())              # type: ignore

@@ -9,11 +9,11 @@ A PyQt5 desktop application for splitting shared expenses on trips — similar t
 - Per-cell configuration: amount, currency, and people-split
 - **Fully dynamic currencies** — add, remove, and configure currencies at runtime
 - **Configurable base currency** with automatic rate recalculation when switching
-- Visual indicators: text colour by currency (auto-assigned Dracula palette), muted-purple background for partial splits
+- Visual indicators: text colour by currency (auto-assigned theme palette), muted background for partial splits
 - One-click balance calculation with currency conversion via any base-currency pivot
 - **Fetch live exchange rates** from the internet (🌐 button) — powered by open.er-api.com
 - **Branded header** with MoneySplitter logo and version display
-- **Dark Dracula theme** — full application-wide dark colour scheme
+- **4 colour themes** — Dracula, Monokai, Nord, Solarized Light — selectable from *View → Theme* (remembered across sessions)
 - Save / Load buttons on the side panel plus File menu shortcuts (Ctrl+S / Ctrl+O)
 - Buildable to a standalone `.exe` via PyInstaller
 
@@ -52,16 +52,16 @@ run.bat
 
 ## Cell colour scheme
 
-Currencies are coloured automatically from a Dracula-friendly palette:
+Currencies are coloured automatically from the active theme’s palette:
 
-| Index | Colour  | Default currency |
-|-------|---------|------------------|
-| 0     | White (foreground) | HUF     |
-| 1     | Cyan    | EUR              |
-| 2     | Green   | USD              |
+| Index | Slot        | Default currency |
+|-------|-------------|------------------|
+| 0     | Foreground  | HUF              |
+| 1     | Cyan        | EUR              |
+| 2     | Green       | USD              |
 | 3+    | Orange, Pink, Yellow, Purple, Red … | user-added |
 
-Cells where the expense is **not** split among everyone get a **muted purple** background.
+Cells where the expense is **not** split among everyone get a **muted accent** background.
 
 ## Building an executable
 
@@ -75,27 +75,31 @@ The resulting `MoneySplitter.exe` appears in the `dist/` folder.
 
 ```
 MoneySplitter/Python/
-├── main.py              # Entry point
-├── logo_MS.png          # Application icon / logo
-├── ui/                  # Frontend — GUI layer
+├── main.py                  # Entry point
+├── logo_MS.png              # Window icon
+├── MoneySplitter_logo.png   # Header logo (full text)
+├── settings.json            # Auto-generated user preferences (theme, etc.)
+├── ui/                      # Frontend — GUI layer
 │   ├── __init__.py
-│   ├── main_window.py   # Main window UI
-│   └── dialogs.py       # Pop-up dialogs (add/remove person, cell editor, rates, currency management)
-├── logic/               # Middle layer — business logic
+│   ├── main_window.py       # Main window UI + View menu
+│   └── dialogs.py           # Pop-up dialogs
+├── logic/                   # Middle layer — business logic
 │   ├── __init__.py
-│   ├── calculator.py    # Balance calculation & currency conversion
-│   └── constants.py     # App-wide constants, defaults, and colour palette
-├── data/                # Backend — data models & persistence
+│   ├── calculator.py        # Balance calculation & currency conversion
+│   ├── constants.py         # App-wide constants & theme-aware colour helpers
+│   └── themes.py            # Colour theme definitions, stylesheet & palette builders
+├── data/                    # Backend — data models & persistence
 │   ├── __init__.py
-│   ├── models.py        # Data models (CellData, TripData)
-│   └── persistence.py   # JSON save/load
-├── json_saves/          # User-saved trip files
-├── requirements.txt     # Python dependencies
-├── run.bat              # Quick launcher
-├── build_exe.bat        # PyInstaller build script
-└── README.md            # This file
+│   ├── models.py            # Data models (CellData, TripData)
+│   ├── persistence.py       # JSON save/load
+│   └── settings.py          # User settings persistence (theme, etc.)
+├── json_saves/              # User-saved trip files
+├── requirements.txt         # Python dependencies
+├── run.bat                  # Quick launcher
+├── build_exe.bat            # PyInstaller build script
+└── README.md                # This file
 ```
 
 ## Version
 
-0.0.2
+0.0.4

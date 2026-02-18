@@ -18,7 +18,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-from logic.constants import DEFAULT_BASE_CURRENCY, DRACULA_RED
+from logic.constants import DEFAULT_BASE_CURRENCY
+from logic.themes import get_active_theme
 from data.models import CellData
 
 
@@ -39,7 +40,9 @@ class AddPersonDialog(QDialog):
 
         # Warning (hidden until needed)
         self.warning_label = QLabel("")
-        self.warning_label.setStyleSheet(f"color: {DRACULA_RED}; font-weight: bold;")
+        self.warning_label.setStyleSheet(
+            f"color: {get_active_theme()['red']}; font-weight: bold;"
+        )
         self.warning_label.setVisible(False)
         layout.addWidget(self.warning_label)
 

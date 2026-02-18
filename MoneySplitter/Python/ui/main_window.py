@@ -3,6 +3,7 @@
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
+    QActionGroup,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -27,24 +28,24 @@ import sys
 
 from logic.constants import (
     APP_NAME,
-    BALANCE_NEGATIVE,
-    BALANCE_POSITIVE,
     BRAND,
-    DEFAULT_BG,
-    DRACULA_BG,
-    DRACULA_COMMENT,
-    DRACULA_CURRENT,
-    DRACULA_CYAN,
-    DRACULA_FG,
-    DRACULA_GREEN,
-    DRACULA_ORANGE,
-    DRACULA_PINK,
-    DRACULA_PURPLE,
-    PARTIAL_SPLIT_BG,
     VERSION,
+    balance_negative,
+    balance_positive,
+    default_bg,
     get_currency_color,
+    partial_split_bg,
+    refresh_theme_colors,
+)
+from logic.themes import (
+    ALL_THEMES,
+    build_palette,
+    build_stylesheet,
+    get_active_theme,
+    set_active_theme,
 )
 from data.models import CellData, TripData
+from data.settings import load_theme_name, save_theme_name
 from ui.dialogs import (
     AddPersonDialog,
     CellEditorDialog,
@@ -54,156 +55,6 @@ from ui.dialogs import (
 )
 from logic.calculator import calculate_balances
 from data.persistence import load_trip, save_trip
-
-# =====================================================================
-# Global Dracula stylesheet (applied to the entire QMainWindow)
-# =====================================================================
-DRACULA_STYLESHEET = f"""
-/* ---- base ---- */
-QMainWindow, QWidget {{
-    background-color: {DRACULA_BG};
-    color: {DRACULA_FG};
-    font-family: 'Segoe UI';
-}}
-QMenuBar {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-}}
-QMenuBar::item:selected {{
-    background-color: {DRACULA_COMMENT};
-}}
-QMenu {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-}}
-QMenu::item:selected {{
-    background-color: {DRACULA_PURPLE};
-}}
-
-/* ---- buttons ---- */
-QPushButton {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-    border-radius: 4px;
-    padding: 6px 12px;
-}}
-QPushButton:hover {{
-    background-color: {DRACULA_COMMENT};
-}}
-QPushButton:pressed {{
-    background-color: {DRACULA_PURPLE};
-}}
-
-/* ---- table ---- */
-QTableWidget {{
-    background-color: {DRACULA_BG};
-    color: {DRACULA_FG};
-    gridline-color: {DRACULA_COMMENT};
-    selection-background-color: {DRACULA_CURRENT};
-    selection-color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-}}
-QHeaderView::section {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_CYAN};
-    border: 1px solid {DRACULA_COMMENT};
-    padding: 4px;
-    font-weight: bold;
-}}
-
-/* ---- inputs ---- */
-QComboBox {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-    border-radius: 3px;
-    padding: 4px;
-}}
-QComboBox QAbstractItemView {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    selection-background-color: {DRACULA_PURPLE};
-}}
-QComboBox::drop-down {{
-    border: none;
-}}
-QLineEdit, QDoubleSpinBox, QSpinBox {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-    border-radius: 3px;
-    padding: 4px;
-}}
-
-/* ---- labels ---- */
-QLabel {{
-    color: {DRACULA_FG};
-}}
-
-/* ---- scroll area ---- */
-QScrollArea {{
-    border: none;
-}}
-QScrollBar:vertical {{
-    background: {DRACULA_BG};
-    width: 12px;
-}}
-QScrollBar::handle:vertical {{
-    background: {DRACULA_COMMENT};
-    border-radius: 4px;
-    min-height: 20px;
-}}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-    height: 0;
-}}
-
-/* ---- status bar ---- */
-QStatusBar {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_COMMENT};
-}}
-
-/* ---- group box ---- */
-QGroupBox {{
-    color: {DRACULA_PURPLE};
-    border: 1px solid {DRACULA_COMMENT};
-    border-radius: 4px;
-    margin-top: 8px;
-    padding-top: 14px;
-}}
-QGroupBox::title {{
-    subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 4px;
-}}
-
-/* ---- check box ---- */
-QCheckBox {{
-    color: {DRACULA_FG};
-    spacing: 6px;
-}}
-QCheckBox::indicator {{
-    width: 16px;
-    height: 16px;
-    border: 1px solid {DRACULA_COMMENT};
-    border-radius: 3px;
-    background-color: {DRACULA_BG};
-}}
-QCheckBox::indicator:checked {{
-    background-color: {DRACULA_PURPLE};
-    border-color: {DRACULA_PURPLE};
-}}
-
-/* ---- tooltip ---- */
-QToolTip {{
-    background-color: {DRACULA_CURRENT};
-    color: {DRACULA_FG};
-    border: 1px solid {DRACULA_COMMENT};
-    padding: 4px;
-}}
-"""
 
 
 class MainWindow(QMainWindow):
@@ -223,7 +74,7 @@ class MainWindow(QMainWindow):
         self._set_window_icon()
         self.setMinimumSize(850, 620)
         self.resize(1050, 720)
-        self.setStyleSheet(DRACULA_STYLESHEET)
+        self._apply_theme_styling()
 
         self._build_menu_bar()
 
@@ -249,7 +100,7 @@ class MainWindow(QMainWindow):
         ver_lbl = QLabel(f"v{VERSION}")
         ver_lbl.setFont(QFont("Segoe UI", 8))
         ver_lbl.setAlignment(Qt.AlignCenter)
-        ver_lbl.setStyleSheet(f"color: {DRACULA_COMMENT};")
+        ver_lbl.setObjectName("ver_lbl")
         hdr_layout.addWidget(ver_lbl)
 
         root.addLayout(hdr_layout)
@@ -312,7 +163,7 @@ class MainWindow(QMainWindow):
         side.addSpacing(16)
 
         res_label = QLabel("Result currency:")
-        res_label.setStyleSheet(f"color: {DRACULA_COMMENT};")
+        res_label.setObjectName("res_label")
         side.addWidget(res_label)
         self.result_currency_combo = QComboBox()
         self._refresh_currency_combo()
@@ -335,14 +186,9 @@ class MainWindow(QMainWindow):
 
         # CALCULATE — always at the very bottom
         self.calc_btn = QPushButton("CALCULATE")
+        self.calc_btn.setObjectName("calc_btn")
         self.calc_btn.setMinimumHeight(54)
         self.calc_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        self.calc_btn.setStyleSheet(
-            f"QPushButton {{ background-color: {DRACULA_GREEN}; color: {DRACULA_BG};"
-            f" border-radius: 6px; border: none; }}"
-            f"QPushButton:hover {{ background-color: #69d97a; }}"
-            f"QPushButton:pressed {{ background-color: #3fcf5e; }}"
-        )
         self.calc_btn.clicked.connect(self._on_calculate)
         side.addWidget(self.calc_btn)
 
@@ -354,9 +200,9 @@ class MainWindow(QMainWindow):
         root.addLayout(top, stretch=5)
 
         # ---- Balance table --------------------------------------------
-        bal_label = QLabel("Balances:")
-        bal_label.setStyleSheet(f"color: {DRACULA_PURPLE}; font-weight: bold;")
-        root.addWidget(bal_label)
+        self.bal_label = QLabel("Balances:")
+        self.bal_label.setObjectName("bal_label")
+        root.addWidget(self.bal_label)
 
         self.balance_table = QTableWidget(1, 0)
         self.balance_table.setFixedHeight(45)
@@ -369,9 +215,6 @@ class MainWindow(QMainWindow):
 
         # ---- Status bar -----------------------------------------------
         self.statusBar().showMessage("Ready — no file loaded")
-        self.statusBar().setStyleSheet(
-            f"color: {DRACULA_COMMENT}; background-color: {DRACULA_CURRENT};"
-        )
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -411,14 +254,65 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _build_menu_bar(self) -> None:
         mb = self.menuBar()
-        fm = mb.addMenu("File")
 
+        # ---- File menu ------------------------------------------------
+        fm = mb.addMenu("File")
         self._add_action(fm, "New Trip", "Ctrl+N", self._on_new_trip)
         self._add_action(fm, "Open…", "Ctrl+O", self._on_open)
         self._add_action(fm, "Save", "Ctrl+S", self._on_save)
         self._add_action(fm, "Save As…", "Ctrl+Shift+S", self._on_save_as)
         fm.addSeparator()
         self._add_action(fm, "Exit", "Alt+F4", self.close)
+
+        # ---- View menu (theme picker) ---------------------------------
+        vm = mb.addMenu("View")
+        theme_menu = vm.addMenu("Theme")
+        self._theme_action_group = QActionGroup(self)
+        self._theme_action_group.setExclusive(True)
+
+        current_name = get_active_theme()["name"]
+        for name in ALL_THEMES:
+            act = QAction(name, self)
+            act.setCheckable(True)
+            act.setChecked(name == current_name)
+            act.setData(name)
+            act.triggered.connect(self._on_theme_changed)
+            self._theme_action_group.addAction(act)
+            theme_menu.addAction(act)
+
+    # ------------------------------------------------------------------
+    def _apply_theme_styling(self) -> None:
+        """Apply the active theme's stylesheet + palette to the window."""
+        from PyQt5.QtWidgets import QApplication
+
+        t = get_active_theme()
+        self.setStyleSheet(build_stylesheet(t))
+        QApplication.instance().setPalette(build_palette(t))
+
+        # Dynamic per-widget tints that reference the active theme
+        # (these use objectName selectors set in _build_ui)
+        # The global stylesheet already covers calc_btn via #calc_btn,
+        # bal_label, ver_lbl, res_label via the theme colours.
+        extra = (
+            f"#ver_lbl {{ color: {t['comment']}; }}"
+            f"#res_label {{ color: {t['comment']}; }}"
+            f"#bal_label {{ color: {t['purple']}; font-weight: bold; }}"
+        )
+        self.setStyleSheet(self.styleSheet() + extra)
+
+    # ------------------------------------------------------------------
+    def _on_theme_changed(self) -> None:
+        """Called when the user picks a theme from the View menu."""
+        action = self._theme_action_group.checkedAction()
+        if not action:
+            return
+        name = action.data()
+        set_active_theme(name)
+        refresh_theme_colors()
+        save_theme_name(name)
+        self._apply_theme_styling()
+        self._refresh_expense_table()
+        self._refresh_balance_table()
 
     @staticmethod
     def _add_action(menu, text, shortcut, slot):
@@ -720,9 +614,9 @@ class MainWindow(QMainWindow):
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
             if val > 0.005:
-                item.setForeground(QBrush(QColor(BALANCE_POSITIVE)))
+                item.setForeground(QBrush(QColor(balance_positive())))
             elif val < -0.005:
-                item.setForeground(QBrush(QColor(BALANCE_NEGATIVE)))
+                item.setForeground(QBrush(QColor(balance_negative())))
 
             self.balance_table.setItem(0, c, item)
 
@@ -753,11 +647,11 @@ class MainWindow(QMainWindow):
         colour = get_currency_color(cell.currency)
         item.setForeground(QBrush(QColor(colour)))
 
-        # Background → pale purple when not everyone is included
+        # Background → partial-split indicator
         if cell.amount and cell.amount > 0:
             if not cell.is_all_checked(all_people):
-                item.setBackground(QBrush(QColor(PARTIAL_SPLIT_BG)))
+                item.setBackground(QBrush(QColor(partial_split_bg())))
             else:
-                item.setBackground(QBrush(QColor(DEFAULT_BG)))
+                item.setBackground(QBrush(QColor(default_bg())))
 
         return item
