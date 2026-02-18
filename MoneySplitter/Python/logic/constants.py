@@ -1,6 +1,6 @@
 """Constants and configuration for the Money Splitter application."""
 
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 APP_NAME = "Money Splitter"
 BRAND = "CsasziTools"
 
@@ -19,18 +19,32 @@ DEFAULT_CONVERSION_RATES = {
 # Table defaults
 DEFAULT_ROW_COUNT = 6
 
-# ---- Colour palette for currencies ----------------------------------
-# The first three entries correspond to the default currencies above.
-# Any extra currencies cycle through the palette from index 3 onwards.
+# =====================================================================
+# Dracula colour scheme
+# =====================================================================
+DRACULA_BG = "#282a36"
+DRACULA_CURRENT = "#44475a"
+DRACULA_FG = "#f8f8f2"
+DRACULA_COMMENT = "#6272a4"
+DRACULA_CYAN = "#8be9fd"
+DRACULA_GREEN = "#50fa7b"
+DRACULA_ORANGE = "#ffb86c"
+DRACULA_PINK = "#ff79c6"
+DRACULA_PURPLE = "#bd93f9"
+DRACULA_RED = "#ff5555"
+DRACULA_YELLOW = "#f1fa8c"
+
+# ---- Colour palette for currencies (Dracula-friendly) ----------------
+# Bright, legible colours that contrast well against #282a36 / #44475a.
 CURRENCY_COLOR_PALETTE = [
-    "#000000",  # 0  Black    (HUF default)
-    "#0000CC",  # 1  Blue     (EUR default)
-    "#008800",  # 2  Green    (USD default)
-    "#CC6600",  # 3  Orange
-    "#990099",  # 4  Purple
-    "#CC0066",  # 5  Magenta
-    "#006699",  # 6  Teal
-    "#996600",  # 7  Brown
+    DRACULA_FG,       # 0  White/foreground (HUF default — base currency)
+    DRACULA_CYAN,     # 1  Cyan             (EUR default)
+    DRACULA_GREEN,    # 2  Green            (USD default)
+    DRACULA_ORANGE,   # 3  Orange
+    DRACULA_PINK,     # 4  Pink
+    DRACULA_YELLOW,   # 5  Yellow
+    DRACULA_PURPLE,   # 6  Purple
+    DRACULA_RED,      # 7  Red
 ]
 
 # Mapping seeded for the built-in currencies; others are assigned at runtime
@@ -57,5 +71,9 @@ def get_currency_color(currency: str) -> str:
 
 
 # Background colour when an expense is NOT split among everyone
-PARTIAL_SPLIT_BG = "#E8D0FF"   # Pale purple
-DEFAULT_BG = "#FFFFFF"          # White
+PARTIAL_SPLIT_BG = "#3d2f58"    # Muted purple (Dracula accent)
+DEFAULT_BG = DRACULA_BG         # Main background
+
+# Balance positive / negative colours
+BALANCE_POSITIVE = DRACULA_GREEN
+BALANCE_NEGATIVE = DRACULA_RED

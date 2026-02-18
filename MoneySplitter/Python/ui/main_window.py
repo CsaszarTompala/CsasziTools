@@ -27,8 +27,19 @@ import sys
 
 from logic.constants import (
     APP_NAME,
+    BALANCE_NEGATIVE,
+    BALANCE_POSITIVE,
     BRAND,
     DEFAULT_BG,
+    DRACULA_BG,
+    DRACULA_COMMENT,
+    DRACULA_CURRENT,
+    DRACULA_CYAN,
+    DRACULA_FG,
+    DRACULA_GREEN,
+    DRACULA_ORANGE,
+    DRACULA_PINK,
+    DRACULA_PURPLE,
     PARTIAL_SPLIT_BG,
     VERSION,
     get_currency_color,
@@ -43,6 +54,156 @@ from ui.dialogs import (
 )
 from logic.calculator import calculate_balances
 from data.persistence import load_trip, save_trip
+
+# =====================================================================
+# Global Dracula stylesheet (applied to the entire QMainWindow)
+# =====================================================================
+DRACULA_STYLESHEET = f"""
+/* ---- base ---- */
+QMainWindow, QWidget {{
+    background-color: {DRACULA_BG};
+    color: {DRACULA_FG};
+    font-family: 'Segoe UI';
+}}
+QMenuBar {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+}}
+QMenuBar::item:selected {{
+    background-color: {DRACULA_COMMENT};
+}}
+QMenu {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+}}
+QMenu::item:selected {{
+    background-color: {DRACULA_PURPLE};
+}}
+
+/* ---- buttons ---- */
+QPushButton {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+    border-radius: 4px;
+    padding: 6px 12px;
+}}
+QPushButton:hover {{
+    background-color: {DRACULA_COMMENT};
+}}
+QPushButton:pressed {{
+    background-color: {DRACULA_PURPLE};
+}}
+
+/* ---- table ---- */
+QTableWidget {{
+    background-color: {DRACULA_BG};
+    color: {DRACULA_FG};
+    gridline-color: {DRACULA_COMMENT};
+    selection-background-color: {DRACULA_CURRENT};
+    selection-color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+}}
+QHeaderView::section {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_CYAN};
+    border: 1px solid {DRACULA_COMMENT};
+    padding: 4px;
+    font-weight: bold;
+}}
+
+/* ---- inputs ---- */
+QComboBox {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+    border-radius: 3px;
+    padding: 4px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    selection-background-color: {DRACULA_PURPLE};
+}}
+QComboBox::drop-down {{
+    border: none;
+}}
+QLineEdit, QDoubleSpinBox, QSpinBox {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+    border-radius: 3px;
+    padding: 4px;
+}}
+
+/* ---- labels ---- */
+QLabel {{
+    color: {DRACULA_FG};
+}}
+
+/* ---- scroll area ---- */
+QScrollArea {{
+    border: none;
+}}
+QScrollBar:vertical {{
+    background: {DRACULA_BG};
+    width: 12px;
+}}
+QScrollBar::handle:vertical {{
+    background: {DRACULA_COMMENT};
+    border-radius: 4px;
+    min-height: 20px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+}}
+
+/* ---- status bar ---- */
+QStatusBar {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_COMMENT};
+}}
+
+/* ---- group box ---- */
+QGroupBox {{
+    color: {DRACULA_PURPLE};
+    border: 1px solid {DRACULA_COMMENT};
+    border-radius: 4px;
+    margin-top: 8px;
+    padding-top: 14px;
+}}
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+}}
+
+/* ---- check box ---- */
+QCheckBox {{
+    color: {DRACULA_FG};
+    spacing: 6px;
+}}
+QCheckBox::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 1px solid {DRACULA_COMMENT};
+    border-radius: 3px;
+    background-color: {DRACULA_BG};
+}}
+QCheckBox::indicator:checked {{
+    background-color: {DRACULA_PURPLE};
+    border-color: {DRACULA_PURPLE};
+}}
+
+/* ---- tooltip ---- */
+QToolTip {{
+    background-color: {DRACULA_CURRENT};
+    color: {DRACULA_FG};
+    border: 1px solid {DRACULA_COMMENT};
+    padding: 4px;
+}}
+"""
 
 
 class MainWindow(QMainWindow):
@@ -62,6 +223,7 @@ class MainWindow(QMainWindow):
         self._set_window_icon()
         self.setMinimumSize(850, 620)
         self.resize(1050, 720)
+        self.setStyleSheet(DRACULA_STYLESHEET)
 
         self._build_menu_bar()
 
@@ -69,40 +231,31 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
-        # ---- Header (logos + version) ---------------------------------
-        hdr_layout = QHBoxLayout()
+        # ---- Header (MS logo + name + version) -----------------------
+        hdr_layout = QVBoxLayout()
         hdr_layout.setAlignment(Qt.AlignCenter)
-        hdr_layout.setSpacing(10)
-
-        cst_path = self._resolve_logo("logo_CsT.png")
-        if cst_path:
-            cst_lbl = QLabel()
-            cst_pm = QPixmap(cst_path).scaled(
-                40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            cst_lbl.setPixmap(cst_pm)
-            hdr_layout.addWidget(cst_lbl)
-
-        sep = QLabel("—")
-        sep.setFont(QFont("Segoe UI", 16, QFont.Bold))
-        hdr_layout.addWidget(sep)
+        hdr_layout.setSpacing(2)
 
         ms_path = self._resolve_logo("logo_MS.png")
         if ms_path:
             ms_lbl = QLabel()
+            ms_lbl.setAlignment(Qt.AlignCenter)
             ms_pm = QPixmap(ms_path).scaled(
-                40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             ms_lbl.setPixmap(ms_pm)
             hdr_layout.addWidget(ms_lbl)
 
-        title_lbl = QLabel(f"  {APP_NAME}")
-        title_lbl.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title_lbl = QLabel(APP_NAME)
+        title_lbl.setFont(QFont("Segoe UI", 10))
+        title_lbl.setAlignment(Qt.AlignCenter)
+        title_lbl.setStyleSheet(f"color: {DRACULA_FG};")
         hdr_layout.addWidget(title_lbl)
 
         ver_lbl = QLabel(f"v{VERSION}")
-        ver_lbl.setFont(QFont("Segoe UI", 10))
-        ver_lbl.setStyleSheet("color: #888;")
+        ver_lbl.setFont(QFont("Segoe UI", 8))
+        ver_lbl.setAlignment(Qt.AlignCenter)
+        ver_lbl.setStyleSheet(f"color: {DRACULA_COMMENT};")
         hdr_layout.addWidget(ver_lbl)
 
         root.addLayout(hdr_layout)
@@ -164,7 +317,9 @@ class MainWindow(QMainWindow):
 
         side.addSpacing(16)
 
-        side.addWidget(QLabel("Result currency:"))
+        res_label = QLabel("Result currency:")
+        res_label.setStyleSheet(f"color: {DRACULA_COMMENT};")
+        side.addWidget(res_label)
         self.result_currency_combo = QComboBox()
         self._refresh_currency_combo()
         side.addWidget(self.result_currency_combo)
@@ -189,9 +344,10 @@ class MainWindow(QMainWindow):
         self.calc_btn.setMinimumHeight(54)
         self.calc_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
         self.calc_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white;"
-            " border-radius: 6px; }"
-            "QPushButton:hover { background-color: #45a049; }"
+            f"QPushButton {{ background-color: {DRACULA_GREEN}; color: {DRACULA_BG};"
+            f" border-radius: 6px; border: none; }}"
+            f"QPushButton:hover {{ background-color: #69d97a; }}"
+            f"QPushButton:pressed {{ background-color: #3fcf5e; }}"
         )
         self.calc_btn.clicked.connect(self._on_calculate)
         side.addWidget(self.calc_btn)
@@ -204,7 +360,9 @@ class MainWindow(QMainWindow):
         root.addLayout(top, stretch=5)
 
         # ---- Balance table --------------------------------------------
-        root.addWidget(QLabel("Balances:"))
+        bal_label = QLabel("Balances:")
+        bal_label.setStyleSheet(f"color: {DRACULA_PURPLE}; font-weight: bold;")
+        root.addWidget(bal_label)
 
         self.balance_table = QTableWidget(1, 0)
         self.balance_table.setFixedHeight(45)
@@ -217,6 +375,9 @@ class MainWindow(QMainWindow):
 
         # ---- Status bar -----------------------------------------------
         self.statusBar().showMessage("Ready — no file loaded")
+        self.statusBar().setStyleSheet(
+            f"color: {DRACULA_COMMENT}; background-color: {DRACULA_CURRENT};"
+        )
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -565,9 +726,9 @@ class MainWindow(QMainWindow):
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
             if val > 0.005:
-                item.setForeground(QBrush(QColor("#008800")))
+                item.setForeground(QBrush(QColor(BALANCE_POSITIVE)))
             elif val < -0.005:
-                item.setForeground(QBrush(QColor("#CC0000")))
+                item.setForeground(QBrush(QColor(BALANCE_NEGATIVE)))
 
             self.balance_table.setItem(0, c, item)
 

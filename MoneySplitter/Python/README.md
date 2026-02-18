@@ -9,10 +9,11 @@ A PyQt5 desktop application for splitting shared expenses on trips — similar t
 - Per-cell configuration: amount, currency, and people-split
 - **Fully dynamic currencies** — add, remove, and configure currencies at runtime
 - **Configurable base currency** with automatic rate recalculation when switching
-- Visual indicators: text colour by currency (auto-assigned palette), pale-purple background for partial splits
+- Visual indicators: text colour by currency (auto-assigned Dracula palette), muted-purple background for partial splits
 - One-click balance calculation with currency conversion via any base-currency pivot
 - **Fetch live exchange rates** from the internet (🌐 button) — powered by open.er-api.com
-- **Branded header** with CsasziTools and MoneySplitter logos plus version display
+- **Branded header** with MoneySplitter logo and version display
+- **Dark Dracula theme** — full application-wide dark colour scheme
 - Save / Load buttons on the side panel plus File menu shortcuts (Ctrl+S / Ctrl+O)
 - Buildable to a standalone `.exe` via PyInstaller
 
@@ -51,16 +52,16 @@ run.bat
 
 ## Cell colour scheme
 
-Currencies are coloured automatically from a repeating palette:
+Currencies are coloured automatically from a Dracula-friendly palette:
 
 | Index | Colour  | Default currency |
 |-------|---------|------------------|
-| 0     | Black   | HUF              |
-| 1     | Blue    | EUR              |
+| 0     | White (foreground) | HUF     |
+| 1     | Cyan    | EUR              |
 | 2     | Green   | USD              |
-| 3+    | Orange, Purple, Magenta, Teal, Brown … | user-added |
+| 3+    | Orange, Pink, Yellow, Purple, Red … | user-added |
 
-Cells where the expense is **not** split among everyone get a **pale purple** background.
+Cells where the expense is **not** split among everyone get a **muted purple** background.
 
 ## Building an executable
 
