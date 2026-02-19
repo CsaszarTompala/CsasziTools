@@ -34,6 +34,15 @@ dist/
 .project
 .settings/
 
+# ----- Android / Gradle -----
+.gradle/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+
 # ----- User preferences -----
 settings.json
 

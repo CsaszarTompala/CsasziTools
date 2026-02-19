@@ -8,6 +8,7 @@
 - [Mouse_and_keyboard_replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)
+- [TravelTool](TravelTool)
 
 ## Tool README links
 
@@ -17,6 +18,7 @@
 - [Mouse and Keyboard Replayer README](Mouse_and_keyboard_replayer/README.md)
 - [OpenJenkins README](OpenJenkins/README.md)
 - [RemoteDesktop README](RemoteDesktop/README.md)
+- [TravelTool README](TravelTool/README.md)
 
 ## Project map
 
@@ -34,6 +36,7 @@
 - [Mouse and Keyboard Replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)
+- [TravelTool](TravelTool) — Android/Kotlin Jetpack Compose travel planner
 
 ## Supporting files
 

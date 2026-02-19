@@ -20,6 +20,7 @@ For every code or file change in this repository:
 - Changes under `OpenJenkins/` -> review `OpenJenkins/README.md` and `CONTENTS.md`
 - Changes under `MoneySplitter/` -> review `MoneySplitter/Python/README.md` and `CONTENTS.md`
 - Changes under `RemoteDesktop/` -> review `RemoteDesktop/README.md` and `CONTENTS.md`
+- Changes under `TravelTool/` -> review `TravelTool/README.md` and `CONTENTS.md`
 
 ## Decision policy
 
