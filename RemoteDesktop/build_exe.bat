@@ -12,36 +12,47 @@ if errorlevel 1 (
     echo.
 )
 
+REM Install project dependencies
+pip install -r "%~dp0requirements.txt"
+echo.
+
 echo Building executable...
 echo.
 
-REM Clean previous build artifacts to ensure icon is applied
+REM Clean previous build artifacts
 if exist "%~dp0build" rmdir /s /q "%~dp0build"
 if exist "%~dp0dist" rmdir /s /q "%~dp0dist"
 if exist "%~dp0RemoteDesktopConnector.spec" del /q "%~dp0RemoteDesktopConnector.spec"
 
 REM Build the executable
-REM --onefile: Create a single executable file
-REM --windowed: No console window (GUI application)
-REM --name: Name of the output executable
-REM --add-data: Include the connections.json if it exists
-
-pyinstaller --noconfirm --clean --onefile --windowed --name "RemoteDesktopConnector" "%~dp0remote_desktop_gui.py"
+cd /d "%~dp0"
+pyinstaller --noconfirm --clean --onefile --windowed ^
+    --name "RemoteDesktopConnector" ^
+    --add-data "logo_RD.png;." ^
+    --add-data "RemoteDesktopConnector_logo.png;." ^
+    --paths "%~dp0" ^
+    --hidden-import ui --hidden-import logic --hidden-import data ^
+    main.py
 
 echo.
-if exist "dist\RemoteDesktopConnector.exe" (
+if exist "%~dp0dist\RemoteDesktopConnector.exe" (
     echo ============================================
     echo  Build successful!
     echo  Executable: dist\RemoteDesktopConnector.exe
     echo ============================================
-    echo.
-    echo You can copy the exe to any location.
-    echo The connections.json file will be created next to the exe on first run.
 ) else (
     echo ============================================
-    echo  Build failed! Check errors above.
+    echo  Build FAILED! Check errors above.
     echo ============================================
+    pause
+    exit /b 1
 )
 
+REM --- Cleanup: keep only dist\ with the exe inside ---
+echo.
+echo Cleaning up build artifacts...
+if exist "%~dp0build" rmdir /s /q "%~dp0build"
+if exist "%~dp0RemoteDesktopConnector.spec" del /q "%~dp0RemoteDesktopConnector.spec"
+echo Done.
 echo.
 pause
