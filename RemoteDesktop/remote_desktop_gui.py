@@ -17,6 +17,125 @@ from tkinter import messagebox, ttk
 from typing import Optional
 
 
+# ---------------------------------------------------------------------------
+# Colour themes  (same palette as MoneySplitter)
+# ---------------------------------------------------------------------------
+THEMES: dict[str, dict[str, str]] = {
+    "Dracula": {
+        "bg":        "#282a36",
+        "current":   "#44475a",
+        "fg":        "#f8f8f2",
+        "comment":   "#6272a4",
+        "cyan":      "#8be9fd",
+        "green":     "#50fa7b",
+        "orange":    "#ffb86c",
+        "pink":      "#ff79c6",
+        "purple":    "#bd93f9",
+        "red":       "#ff5555",
+        "yellow":    "#f1fa8c",
+        "accent":    "#bd93f9",
+        "btn_bg":    "#44475a",
+        "btn_fg":    "#f8f8f2",
+        "btn_active":"#6272a4",
+        "entry_bg":  "#44475a",
+        "entry_fg":  "#f8f8f2",
+        "select_bg": "#6272a4",
+    },
+    "Monokai": {
+        "bg":        "#272822",
+        "current":   "#3e3d32",
+        "fg":        "#f8f8f2",
+        "comment":   "#75715e",
+        "cyan":      "#66d9ef",
+        "green":     "#a6e22e",
+        "orange":    "#fd971f",
+        "pink":      "#f92672",
+        "purple":    "#ae81ff",
+        "red":       "#f92672",
+        "yellow":    "#e6db74",
+        "accent":    "#a6e22e",
+        "btn_bg":    "#3e3d32",
+        "btn_fg":    "#f8f8f2",
+        "btn_active":"#75715e",
+        "entry_bg":  "#3e3d32",
+        "entry_fg":  "#f8f8f2",
+        "select_bg": "#75715e",
+    },
+    "Nord": {
+        "bg":        "#2e3440",
+        "current":   "#3b4252",
+        "fg":        "#eceff4",
+        "comment":   "#4c566a",
+        "cyan":      "#88c0d0",
+        "green":     "#a3be8c",
+        "orange":    "#d08770",
+        "pink":      "#b48ead",
+        "purple":    "#b48ead",
+        "red":       "#bf616a",
+        "yellow":    "#ebcb8b",
+        "accent":    "#88c0d0",
+        "btn_bg":    "#3b4252",
+        "btn_fg":    "#eceff4",
+        "btn_active":"#4c566a",
+        "entry_bg":  "#3b4252",
+        "entry_fg":  "#eceff4",
+        "select_bg": "#4c566a",
+    },
+    "Solarized Light": {
+        "bg":        "#fdf6e3",
+        "current":   "#eee8d5",
+        "fg":        "#657b83",
+        "comment":   "#93a1a1",
+        "cyan":      "#2aa198",
+        "green":     "#859900",
+        "orange":    "#cb4b16",
+        "pink":      "#d33682",
+        "purple":    "#6c71c4",
+        "red":       "#dc322f",
+        "yellow":    "#b58900",
+        "accent":    "#268bd2",
+        "btn_bg":    "#eee8d5",
+        "btn_fg":    "#657b83",
+        "btn_active":"#93a1a1",
+        "entry_bg":  "#eee8d5",
+        "entry_fg":  "#657b83",
+        "select_bg": "#93a1a1",
+    },
+}
+
+DEFAULT_THEME = "Dracula"
+
+# Settings file (theme preference)
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+
+
+def load_theme_name() -> str:
+    """Load the saved theme name from settings, defaulting to Dracula."""
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            name = data.get("theme", DEFAULT_THEME)
+            return name if name in THEMES else DEFAULT_THEME
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        return DEFAULT_THEME
+
+
+def save_theme_name(name: str) -> None:
+    """Persist the selected theme name to settings.json."""
+    data: dict = {}
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        pass
+    data["theme"] = name
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except IOError:
+        pass
+
+
 # Configuration file path
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "connections.json")
 
@@ -145,6 +264,9 @@ class AddConnectionDialog(tk.Toplevel):
         self.parent = parent
         self.result = None
         self.edit_mode = edit_connection is not None
+        # Apply theme colours to Toplevel
+        t = THEMES[getattr(parent, "_current_theme_name", DEFAULT_THEME)]
+        self.configure(bg=t["bg"])
         # Window configuration
         self.title("Edit Connection" if self.edit_mode else "Add New Connection")
         self.geometry("400x280")
@@ -299,12 +421,103 @@ class RemoteDesktopApp(tk.Tk):
         self.geometry("350x450")
         self.minsize(300, 350)
         self.resizable(True, True)
+        # Theme
+        self._current_theme_name = load_theme_name()
+        self._apply_theme(self._current_theme_name)
         # Load connections
         self.connections = load_connections()
         # Create widgets
+        self._build_menu_bar()
         self._create_widgets()
         # Center the window on screen
         self._center_window()
+
+    # ------------------------------------------------------------------
+    # Theme helpers
+    # ------------------------------------------------------------------
+    def _apply_theme(self, name: str) -> None:
+        """Apply a colour theme to the entire application."""
+        t = THEMES[name]
+        self._current_theme_name = name
+
+        # Root window
+        self.configure(bg=t["bg"])
+
+        # ttk style
+        style = ttk.Style(self)
+        style.theme_use("clam")  # clam allows full colour overriding
+
+        style.configure(".", background=t["bg"], foreground=t["fg"],
+                         fieldbackground=t["entry_bg"],
+                         troughcolor=t["current"],
+                         selectbackground=t["select_bg"],
+                         selectforeground=t["fg"])
+
+        style.configure("TFrame", background=t["bg"])
+        style.configure("TLabel", background=t["bg"], foreground=t["fg"])
+        style.configure("TButton", background=t["btn_bg"], foreground=t["btn_fg"],
+                         padding=(8, 4), borderwidth=1, relief="flat")
+        style.map("TButton",
+                   background=[("active", t["btn_active"]), ("pressed", t["accent"])],
+                   foreground=[("active", t["fg"])])
+
+        style.configure("Title.TLabel", font=("Segoe UI", 14, "bold"),
+                         foreground=t["accent"])
+
+        style.configure("TCheckbutton", background=t["bg"], foreground=t["fg"])
+        style.map("TCheckbutton", background=[("active", t["bg"])])
+
+        style.configure("TEntry", fieldbackground=t["entry_bg"],
+                         foreground=t["entry_fg"], insertcolor=t["fg"])
+
+        style.configure("Vertical.TScrollbar", background=t["current"],
+                         troughcolor=t["bg"], arrowcolor=t["fg"])
+        style.map("Vertical.TScrollbar",
+                   background=[("active", t["btn_active"])])
+
+    def _switch_theme(self, name: str) -> None:
+        """Switch theme, update widgets, and persist."""
+        self._apply_theme(name)
+        save_theme_name(name)
+        # Update the radio-button check marks
+        for act_name in THEMES:
+            var = self._theme_vars.get(act_name)
+            if var:
+                var.set(act_name == name)
+        # Rebuild UI to pick up new colours
+        self._refresh_buttons()
+        # Re-apply canvas colour
+        self.canvas.configure(bg=THEMES[name]["bg"])
+
+    # ------------------------------------------------------------------
+    # Menu bar
+    # ------------------------------------------------------------------
+    def _build_menu_bar(self) -> None:
+        t = THEMES[self._current_theme_name]
+        mb = tk.Menu(self, bg=t["current"], fg=t["fg"],
+                     activebackground=t["select_bg"], activeforeground=t["fg"],
+                     relief="flat", borderwidth=0)
+
+        # View > Theme
+        view_menu = tk.Menu(mb, tearoff=0, bg=t["current"], fg=t["fg"],
+                            activebackground=t["select_bg"],
+                            activeforeground=t["fg"])
+        theme_menu = tk.Menu(view_menu, tearoff=0, bg=t["current"], fg=t["fg"],
+                             activebackground=t["select_bg"],
+                             activeforeground=t["fg"])
+
+        self._theme_vars: dict[str, tk.BooleanVar] = {}
+        for name in THEMES:
+            var = tk.BooleanVar(value=(name == self._current_theme_name))
+            self._theme_vars[name] = var
+            theme_menu.add_checkbutton(
+                label=name, variable=var,
+                command=lambda n=name: self._switch_theme(n),
+            )
+
+        view_menu.add_cascade(label="Theme", menu=theme_menu)
+        mb.add_cascade(label="View", menu=view_menu)
+        self.config(menu=mb)
 
     def _center_window(self) -> None:
         """
@@ -339,14 +552,15 @@ class RemoteDesktopApp(tk.Tk):
         title_label = ttk.Label(
             self,
             text="Remote Desktop Connector",
-            font=("Segoe UI", 14, "bold")
+            style="Title.TLabel",
         )
         title_label.pack(pady=(20, 10))
         # Connections frame with scrollbar
         container = ttk.Frame(self)
         container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         # Canvas for scrolling
-        self.canvas = tk.Canvas(container, highlightthickness=0)
+        t = THEMES[self._current_theme_name]
+        self.canvas = tk.Canvas(container, highlightthickness=0, bg=t["bg"])
         scrollbar = ttk.Scrollbar(container, orient=tk.VERTICAL, command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
         self.scrollable_frame.bind(

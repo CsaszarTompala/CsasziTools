@@ -91,7 +91,7 @@ run_gui.bat
 - Stored connection list
 - Quick-launch buttons for saved connections
 - Add/edit/delete connection profiles
-- Recent connections history
+- **4 colour themes** — Dracula (default), Monokai, Nord, Solarized Light — selectable from *View → Theme* (remembered across sessions)
 
 ## How It Works
 
