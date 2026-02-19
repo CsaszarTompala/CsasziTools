@@ -77,7 +77,7 @@ These batch files contain pre-configured credentials and connection details.
 Start the GUI application:
 
 ```bash
-python remote_desktop_gui.py
+python main.py
 ```
 
 Or use the batch file:
@@ -87,10 +87,10 @@ run_gui.bat
 ```
 
 **GUI Features:**
-- Visual connection manager
-- Stored connection list
+- **Branded header** with RemoteDesktopConnector logo
+- Visual connection manager with scrollable list
 - Quick-launch buttons for saved connections
-- Add/edit/delete connection profiles
+- Add / edit / delete connection profiles
 - **4 colour themes** — Dracula (default), Monokai, Nord, Solarized Light — selectable from *View → Theme* (remembered across sessions)
 
 ## How It Works
@@ -155,13 +155,26 @@ Edit the corresponding .bat file and update:
 
 ```
 RemoteDesktop/
-├── remote_desktop.py           # Command-line interface
-├── remote_desktop_gui.py       # GUI application
-├── README.md                   # This file
-├── run_gui.bat                # GUI launcher
-├── build_exe.bat              # PyInstaller build script
-├── RemoteDesktopConnector.spec # PyInstaller spec file
-│
+├── main.py                          # GUI entry point
+├── remote_desktop.py                # CLI interface (standalone)
+├── logo_RD.png                      # Window icon
+├── RemoteDesktopConnector_logo.png   # Header logo (full text)
+├── settings.json                    # Auto-generated user preferences
+├── ui/                              # Frontend — GUI layer
+│   ├── __init__.py
+│   ├── main_window.py               # Main window + View menu
+│   └── dialogs.py                   # Add/Edit connection dialog
+├── logic/                           # Middle layer — business logic
+│   ├── __init__.py
+│   ├── rdp.py                       # Credential storage & mstsc launch
+│   └── themes.py                    # Colour theme definitions & persistence
+├── data/                            # Backend — data persistence
+│   ├── __init__.py
+│   └── connections.py               # Connection load/save + defaults
+├── requirements.txt                 # Python dependencies (Pillow)
+├── run_gui.bat                      # GUI launcher
+├── build_exe.bat                    # PyInstaller build script
+├── RemoteDesktopConnector.spec      # PyInstaller spec file
 └── Connection Shortcuts:
     ├── connect_to_Luke.bat
     ├── connect_to_Chewie.bat
