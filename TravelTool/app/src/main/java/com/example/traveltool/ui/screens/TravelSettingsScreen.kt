@@ -1,0 +1,395 @@
+package com.example.traveltool.ui.screens
+
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.traveltool.data.*
+import com.example.traveltool.ui.components.CurrencyPicker
+import com.example.traveltool.ui.theme.*
+import kotlinx.coroutines.launch
+
+/**
+ * Travel settings: car/plane mode, fuel, tolls, plane tickets, additional fees.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TravelSettingsScreen(
+    tripId: String,
+    tripViewModel: TripViewModel,
+    onApiKeySettings: () -> Unit,
+    onBack: () -> Unit
+) {
+    val trip = tripViewModel.getTripById(tripId)
+
+    if (trip == null) {
+        onBack()
+        return
+    }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currencies = remember { mutableStateOf(CurrencyManager.getCurrencyList(context)) }
+
+    LaunchedEffect(Unit) {
+        currencies.value = CurrencyManager.getCurrencyList(context)
+    }
+
+    var fuelText by remember { mutableStateOf(trip.fuelConsumption?.toString() ?: "") }
+    var fuelPriceText by remember { mutableStateOf(trip.fuelPricePerLiter?.toString() ?: "") }
+
+    var showAddTollDialog by remember { mutableStateOf(false) }
+    var editingToll by remember { mutableStateOf<TollRoad?>(null) }
+    var tollToDelete by remember { mutableStateOf<TollRoad?>(null) }
+    var isSearchingTolls by remember { mutableStateOf(false) }
+
+    var showAddTicketDialog by remember { mutableStateOf(false) }
+    var editingTicket by remember { mutableStateOf<PlaneTicket?>(null) }
+    var ticketToDelete by remember { mutableStateOf<PlaneTicket?>(null) }
+
+    var showAddFeeDialog by remember { mutableStateOf(false) }
+    var editingFee by remember { mutableStateOf<AdditionalFee?>(null) }
+    var feeToDelete by remember { mutableStateOf<AdditionalFee?>(null) }
+
+    var showMissingKeyDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Travel Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            // ── Travel Mode ─────────────────────────────────
+            item {
+                SectionHeader("Travel Mode")
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TravelMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = trip.travelMode == mode,
+                            onClick = { tripViewModel.updateTrip(trip.copy(travelMode = mode)) },
+                            label = { Text(when (mode) { TravelMode.CAR -> "🚗 Car"; TravelMode.MICROBUS -> "🚐 Microbus"; TravelMode.PLANE -> "✈️ Plane" }) },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = DraculaPurple, selectedLabelColor = DraculaForeground),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // ══════════════ CAR / MICROBUS MODE ══════════════
+            if (trip.travelMode == TravelMode.CAR || trip.travelMode == TravelMode.MICROBUS) {
+                item {
+                    OutlinedTextField(
+                        value = fuelText,
+                        onValueChange = { fuelText = it; tripViewModel.updateTrip(trip.copy(fuelConsumption = it.toDoubleOrNull())) },
+                        label = { Text("Fuel consumption (L/100km)") },
+                        placeholder = { Text("e.g. 7.5") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        colors = draculaTextFieldColors(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = fuelPriceText,
+                            onValueChange = { fuelPriceText = it; tripViewModel.updateTrip(trip.copy(fuelPricePerLiter = it.toDoubleOrNull())) },
+                            label = { Text("Fuel price / liter") },
+                            placeholder = { Text("e.g. 1.65") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                            colors = draculaTextFieldColors(),
+                        )
+                        CurrencyPicker(
+                            selected = trip.fuelPriceCurrency,
+                            currencies = currencies.value,
+                            onSelect = { tripViewModel.updateTrip(trip.copy(fuelPriceCurrency = it)) },
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Toll Roads & Vignettes") }
+
+                if (trip.tollRoads.isEmpty()) {
+                    item { Text("No toll roads added.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                }
+                items(trip.tollRoads, key = { it.id }) { toll ->
+                    PriceItemCard(toll.name, toll.price, toll.currency, if (toll.isAutoGenerated) "AI" else null, { editingToll = toll }, { tollToDelete = toll })
+                }
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = { showAddTollDialog = true }, Modifier.weight(1f)) {
+                            Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Toll")
+                        }
+                        Button(
+                            onClick = {
+                                val apiKey = ApiKeyStore.getOpenAiKey(context)
+                                if (apiKey.isBlank()) {
+                                    showMissingKeyDialog = true
+                                    return@Button
+                                }
+                                val model = ApiKeyStore.getOpenAiModel(context)
+                                if (trip.startingPoint.isBlank()) { Toast.makeText(context, "Set a starting point first", Toast.LENGTH_SHORT).show(); return@Button }
+                                if (trip.accommodations.isEmpty()) { Toast.makeText(context, "Add accommodations first", Toast.LENGTH_SHORT).show(); return@Button }
+                                isSearchingTolls = true
+                                scope.launch {
+                                    val autoTolls = DirectionsApiHelper.findTollsForTrip(
+                                        startingPoint = trip.startingPoint,
+                                        accommodations = trip.accommodations,
+                                        openAiApiKey = apiKey,
+                                        travelMode = trip.travelMode,
+                                        tripStartMillis = trip.startMillis,
+                                        tripEndMillis = trip.endMillis,
+                                        model = model
+                                    )
+                                    val userTolls = trip.tollRoads.filter { !it.isAutoGenerated }
+                                    tripViewModel.updateTrip(trip.copy(tollRoads = userTolls + autoTolls))
+                                    isSearchingTolls = false
+                                    Toast.makeText(context, if (autoTolls.isNotEmpty()) "Found ${autoTolls.size} toll(s) via AI" else "No tolls found — check API key or route", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            enabled = !isSearchingTolls, modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = DraculaCyan, contentColor = DraculaBackground),
+                        ) {
+                            if (isSearchingTolls) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DraculaBackground)
+                            else Icon(Icons.Default.Search, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp)); Text(if (isSearchingTolls) "AI…" else "Find tolls")
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            // ══════════════ PLANE MODE ══════════════
+            if (trip.travelMode == TravelMode.PLANE) {
+                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Plane Tickets") }
+                if (trip.planeTickets.isEmpty()) {
+                    item { Text("No plane tickets added.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                }
+                items(trip.planeTickets, key = { it.id }) { ticket ->
+                    PriceItemCard(ticket.name, ticket.price, ticket.currency, null, { editingTicket = ticket }, { ticketToDelete = ticket })
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { showAddTicketDialog = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Plane Ticket")
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            // ══════════════ ADDITIONAL FEES ══════════════
+            item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Additional Fees") }
+            if (trip.additionalFees.isEmpty()) {
+                item { Text("No additional fees.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+            }
+            items(trip.additionalFees, key = { it.id }) { fee ->
+                PriceItemCard(fee.name, fee.price, fee.currency, null, { editingFee = fee }, { feeToDelete = fee })
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { showAddFeeDialog = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                    Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Fee")
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            item {
+                Spacer(Modifier.height(80.dp))
+            }
+        }
+    }
+
+    // ════════════════ DIALOGS ════════════════
+
+    if (showAddTollDialog) {
+        PriceEditDialog("Add Toll", "", "", currencies.value, trip.displayCurrency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(tollRoads = trip.tollRoads + TollRoad(name = n, price = p, currency = c, isAutoGenerated = false))); showAddTollDialog = false },
+            { showAddTollDialog = false })
+    }
+    editingToll?.let { t ->
+        PriceEditDialog("Edit Toll", t.name, if (t.price > 0) t.price.toString() else "", currencies.value, t.currency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(tollRoads = trip.tollRoads.map { if (it.id == t.id) it.copy(name = n, price = p, currency = c) else it })); editingToll = null },
+            { editingToll = null })
+    }
+    tollToDelete?.let { t ->
+        DeleteConfirmDialog("Delete Toll", t.name, { tripViewModel.updateTrip(trip.copy(tollRoads = trip.tollRoads.filter { it.id != t.id })); tollToDelete = null }, { tollToDelete = null })
+    }
+
+    if (showAddTicketDialog) {
+        PriceEditDialog("Add Plane Ticket", "", "", currencies.value, trip.displayCurrency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets + PlaneTicket(name = n, price = p, currency = c))); showAddTicketDialog = false },
+            { showAddTicketDialog = false })
+    }
+    editingTicket?.let { t ->
+        PriceEditDialog("Edit Ticket", t.name, if (t.price > 0) t.price.toString() else "", currencies.value, t.currency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.map { if (it.id == t.id) it.copy(name = n, price = p, currency = c) else it })); editingTicket = null },
+            { editingTicket = null })
+    }
+    ticketToDelete?.let { t ->
+        DeleteConfirmDialog("Delete Ticket", t.name, { tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.filter { it.id != t.id })); ticketToDelete = null }, { ticketToDelete = null })
+    }
+
+    if (showAddFeeDialog) {
+        PriceEditDialog("Add Fee", "", "", currencies.value, trip.displayCurrency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(additionalFees = trip.additionalFees + AdditionalFee(name = n, price = p, currency = c))); showAddFeeDialog = false },
+            { showAddFeeDialog = false })
+    }
+    editingFee?.let { f ->
+        PriceEditDialog("Edit Fee", f.name, if (f.price > 0) f.price.toString() else "", currencies.value, f.currency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(additionalFees = trip.additionalFees.map { if (it.id == f.id) it.copy(name = n, price = p, currency = c) else it })); editingFee = null },
+            { editingFee = null })
+    }
+    feeToDelete?.let { f ->
+        DeleteConfirmDialog("Delete Fee", f.name, { tripViewModel.updateTrip(trip.copy(additionalFees = trip.additionalFees.filter { it.id != f.id })); feeToDelete = null }, { feeToDelete = null })
+    }
+
+    if (showMissingKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showMissingKeyDialog = false },
+            title = { Text("API Key Required") },
+            text = { Text("To use automatic toll finding you need to set your OpenAI API key.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showMissingKeyDialog = false
+                        onApiKeySettings()
+                    }
+                ) { Text("Set API Key", color = DraculaGreen) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMissingKeyDialog = false }) { Text("Cancel") }
+            },
+            containerColor = DraculaCurrent,
+            titleContentColor = DraculaForeground,
+            textContentColor = DraculaForeground,
+        )
+    }
+}
+
+// ════════════════ REUSABLE COMPOSABLES ════════════════
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = DraculaPurple,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
+}
+
+@Composable
+private fun draculaTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
+)
+
+
+@Composable
+private fun PriceItemCard(name: String, price: Double, currency: String, badge: String? = null, onClick: () -> Unit, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp).clickable { onClick() },
+        shape = RoundedCornerShape(10.dp), colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = DraculaForeground)
+                    if (badge != null) { Spacer(Modifier.width(6.dp)); Text(badge, fontSize = 10.sp, color = DraculaCyan) }
+                }
+                Text(if (price > 0) "💰 $price $currency" else "Price not set", fontSize = 13.sp,
+                    color = if (price > 0) DraculaGreen else DraculaComment)
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, "Delete", tint = DraculaRed, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PriceEditDialog(
+    title: String, initialName: String, initialPrice: String,
+    currencies: List<String>, initialCurrency: String,
+    onConfirm: (name: String, price: Double, currency: String) -> Unit, onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var priceText by remember { mutableStateOf(initialPrice) }
+    var currency by remember { mutableStateOf(initialCurrency) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), colors = draculaTextFieldColors())
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("Price") },
+                        placeholder = { Text("0.00") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = draculaTextFieldColors())
+                    CurrencyPicker(selected = currency, currencies = currencies, onSelect = { currency = it })
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), priceText.toDoubleOrNull() ?: 0.0, currency) }) { Text("OK", color = DraculaGreen) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+    )
+}
+
+@Composable
+private fun DeleteConfirmDialog(title: String, itemName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text(title) },
+        text = { Text("Delete \"${itemName.ifBlank { "(unnamed)" }}\"?") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = DraculaRed) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+    )
+}
