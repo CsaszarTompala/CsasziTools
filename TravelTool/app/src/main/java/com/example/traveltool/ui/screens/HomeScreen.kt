@@ -38,6 +38,7 @@ fun HomeScreen(
     onDeleteTrip: (String) -> Unit,
     onSettings: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     var tripToDelete by remember { mutableStateOf<Trip?>(null) }
 
     Scaffold(
@@ -58,7 +59,7 @@ fun HomeScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddTrip,
-                containerColor = DraculaGreen,
+                containerColor = colors.green,
                 contentColor = MaterialTheme.colorScheme.background,
             ) {
                 Text("+ Add Trip", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -92,7 +93,7 @@ fun HomeScreen(
                         text = "Your Trips",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = DraculaForeground,
+                        color = colors.foreground,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp, vertical = 8.dp),
@@ -127,7 +128,7 @@ fun HomeScreen(
                         tripToDelete = null
                     }
                 ) {
-                    Text("Delete", color = DraculaRed)
+                    Text("Delete", color = colors.red)
                 }
             },
             dismissButton = {
@@ -135,9 +136,9 @@ fun HomeScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 }
@@ -148,6 +149,7 @@ private fun TripCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
     val startDate  = remember(trip.startMillis) { dateFormat.format(Date(trip.startMillis)) }
     val endDate    = remember(trip.endMillis)   { dateFormat.format(Date(trip.endMillis)) }
@@ -159,7 +161,7 @@ private fun TripCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = DraculaCurrent,
+            containerColor = colors.current,
         ),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -172,20 +174,20 @@ private fun TripCard(
                     text = trip.name,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DraculaPurple,
+                    color = colors.primary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "$startDate – $endDate",
                     fontSize = 14.sp,
-                    color = DraculaOrange,
+                    color = colors.orange,
                 )
                 if (trip.location.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "📍 ${trip.location}",
                         fontSize = 14.sp,
-                        color = DraculaForeground,
+                        color = colors.foreground,
                     )
                 }
             }
@@ -196,14 +198,14 @@ private fun TripCard(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Delete trip",
-                    tint = DraculaRed,
+                    tint = colors.red,
                 )
             }
             if (trip.hasWarning) {
                 Icon(
                     Icons.Default.Warning,
                     contentDescription = "Trip has warnings",
-                    tint = DraculaYellow,
+                    tint = colors.yellow,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(12.dp)

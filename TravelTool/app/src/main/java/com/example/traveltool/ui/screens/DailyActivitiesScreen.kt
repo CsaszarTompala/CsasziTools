@@ -32,6 +32,7 @@ fun DailyActivitiesScreen(
     onDayClick: (Long) -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -79,7 +80,7 @@ fun DailyActivitiesScreen(
                 item {
                     Text(
                         "Add accommodations to unlock daily activity planning.",
-                        fontSize = 14.sp, color = DraculaComment,
+                        fontSize = 14.sp, color = colors.comment,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     )
                 }
@@ -125,7 +126,7 @@ fun DailyActivitiesScreen(
                             ),
                         shape = RoundedCornerShape(10.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (hasCoverage || isFinalDay) DraculaCurrent else DraculaCurrent.copy(alpha = 0.4f)
+                            containerColor = if (hasCoverage || isFinalDay) colors.current else colors.current.copy(alpha = 0.4f)
                         ),
                     ) {
                         Row(
@@ -145,25 +146,25 @@ fun DailyActivitiesScreen(
                                            else "Day $dayNumber — $dayLabel",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = if (hasCoverage || isFinalDay) DraculaForeground else DraculaComment,
+                                    color = if (hasCoverage || isFinalDay) colors.foreground else colors.comment,
                                 )
                                 if (isFinalDay) {
                                     Text(
                                         text = "Traveling home from ${trip.location}",
                                         fontSize = 12.sp,
-                                        color = DraculaOrange,
+                                        color = colors.orange,
                                     )
                                 } else if (coveringAccom != null && coveringAccom.location.isNotBlank()) {
                                     Text(
                                         text = coveringAccom.location,
                                         fontSize = 12.sp,
-                                        color = DraculaComment,
+                                        color = colors.comment,
                                     )
                                 } else {
                                     Text(
                                         "No accommodation",
                                         fontSize = 12.sp,
-                                        color = DraculaRed,
+                                        color = colors.red,
                                     )
                                 }
                             }
@@ -171,7 +172,7 @@ fun DailyActivitiesScreen(
                                 Icon(
                                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                     contentDescription = null,
-                                    tint = DraculaComment,
+                                    tint = colors.comment,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }

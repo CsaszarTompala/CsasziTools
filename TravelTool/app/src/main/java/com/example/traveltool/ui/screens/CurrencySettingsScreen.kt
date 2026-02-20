@@ -33,6 +33,7 @@ fun CurrencySettingsScreen(
     baseCurrency: String,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -83,13 +84,13 @@ fun CurrencySettingsScreen(
                     text = "Exchange Rates",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = DraculaPurple,
+                    color = colors.primary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                 )
                 Text(
                     text = "Rates shown as: 1 [currency] = ? $baseCurrency\nTap a rate to edit it manually.",
                     fontSize = 12.sp,
-                    color = DraculaComment,
+                    color = colors.comment,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
                 )
                 Spacer(Modifier.height(8.dp))
@@ -111,12 +112,12 @@ fun CurrencySettingsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DraculaCyan,
-                        contentColor = DraculaBackground,
+                        containerColor = colors.accent,
+                        contentColor = colors.background,
                     ),
                 ) {
                     if (isRefreshing) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DraculaBackground)
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.background)
                     } else {
                         Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
                     }
@@ -136,15 +137,15 @@ fun CurrencySettingsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp, vertical = 3.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaPurple.copy(alpha = 0.2f)),
+                    colors = CardDefaults.cardColors(containerColor = colors.primary.copy(alpha = 0.2f)),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(baseCurrency, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DraculaPurple)
+                        Text(baseCurrency, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.primary)
                         Spacer(Modifier.weight(1f))
-                        Text("Base currency", fontSize = 13.sp, color = DraculaComment)
+                        Text("Base currency", fontSize = 13.sp, color = colors.comment)
                     }
                 }
             }
@@ -166,7 +167,7 @@ fun CurrencySettingsScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp, vertical = 3.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    colors = CardDefaults.cardColors(containerColor = colors.current),
                     onClick = {
                         editingCurrency = code
                         editRateText = if (rate != null) {
@@ -181,8 +182,8 @@ fun CurrencySettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(code, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = DraculaForeground)
-                            Text(rateDisplay, fontSize = 13.sp, color = DraculaGreen)
+                            Text(code, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.foreground)
+                            Text(rateDisplay, fontSize = 13.sp, color = colors.green)
                         }
                         if (!isDefault) {
                             IconButton(
@@ -193,7 +194,7 @@ fun CurrencySettingsScreen(
                                 },
                                 modifier = Modifier.size(32.dp),
                             ) {
-                                Icon(Icons.Default.Close, "Remove", tint = DraculaRed, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Close, "Remove", tint = colors.red, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -223,7 +224,7 @@ fun CurrencySettingsScreen(
             title = { Text("Add Currency") },
             text = {
                 Column {
-                    Text("Enter the 3-letter currency code (e.g. GBP, CHF, CZK, RON).", fontSize = 13.sp, color = DraculaComment)
+                    Text("Enter the 3-letter currency code (e.g. GBP, CHF, CZK, RON).", fontSize = 13.sp, color = colors.comment)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = newCode,
@@ -234,19 +235,19 @@ fun CurrencySettingsScreen(
                         isError = validationError != null,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
+                            focusedBorderColor = colors.primary, focusedLabelColor = colors.primary, cursorColor = colors.primary,
                         )
                     )
                     if (validationError != null) {
                         Spacer(Modifier.height(4.dp))
-                        Text(validationError!!, fontSize = 12.sp, color = DraculaRed)
+                        Text(validationError!!, fontSize = 12.sp, color = colors.red)
                     }
                     if (isValidating) {
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = DraculaPurple)
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = colors.primary)
                             Spacer(Modifier.width(8.dp))
-                            Text("Validating…", fontSize = 12.sp, color = DraculaComment)
+                            Text("Validating…", fontSize = 12.sp, color = colors.comment)
                         }
                     }
                 }
@@ -274,10 +275,10 @@ fun CurrencySettingsScreen(
                         }
                     },
                     enabled = !isValidating,
-                ) { Text("Add", color = DraculaGreen) }
+                ) { Text("Add", color = colors.green) }
             },
             dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("Cancel") } },
-            containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+            containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
         )
     }
 
@@ -288,9 +289,9 @@ fun CurrencySettingsScreen(
             title = { Text("Edit Rate: $code") },
             text = {
                 Column {
-                    Text("How many $baseCurrency is 1 $code?", fontSize = 14.sp, color = DraculaForeground)
+                    Text("How many $baseCurrency is 1 $code?", fontSize = 14.sp, color = colors.foreground)
                     Spacer(Modifier.height(4.dp))
-                    Text("1 $code = ? $baseCurrency", fontSize = 12.sp, color = DraculaComment)
+                    Text("1 $code = ? $baseCurrency", fontSize = 12.sp, color = colors.comment)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = editRateText,
@@ -300,7 +301,7 @@ fun CurrencySettingsScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
+                            focusedBorderColor = colors.primary, focusedLabelColor = colors.primary, cursorColor = colors.primary,
                         )
                     )
                 }
@@ -316,10 +317,10 @@ fun CurrencySettingsScreen(
                             Toast.makeText(context, "Rate saved", Toast.LENGTH_SHORT).show()
                         }
                     }
-                ) { Text("Save", color = DraculaGreen) }
+                ) { Text("Save", color = colors.green) }
             },
             dismissButton = { TextButton(onClick = { editingCurrency = null }) { Text("Cancel") } },
-            containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+            containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
         )
     }
 }

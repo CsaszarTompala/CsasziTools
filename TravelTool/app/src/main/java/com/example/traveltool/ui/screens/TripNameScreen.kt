@@ -10,8 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.traveltool.ui.theme.DraculaGreen
-import com.example.traveltool.ui.theme.DraculaPurple
+import com.example.traveltool.ui.theme.*
 
 /**
  * Step 1 — ask the user for a trip name.
@@ -22,6 +21,7 @@ fun TripNameScreen(
     onNext: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     var name by remember { mutableStateOf("") }
 
     Scaffold(
@@ -52,7 +52,7 @@ fun TripNameScreen(
                 "What will this trip be called?",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DraculaPurple,
+                color = colors.primary,
             )
 
             Spacer(Modifier.height(24.dp))
@@ -64,9 +64,9 @@ fun TripNameScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    cursorColor = colors.primary,
+                    focusedLabelColor = colors.primary,
                 )
             )
 
@@ -79,7 +79,7 @@ fun TripNameScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DraculaGreen,
+                    containerColor = colors.green,
                     contentColor = MaterialTheme.colorScheme.background,
                 )
             ) {

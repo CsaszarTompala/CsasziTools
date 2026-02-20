@@ -50,6 +50,7 @@ fun EditAccommodationScreen(
     tripViewModel: TripViewModel,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
     val accom = trip?.accommodations?.find { it.id == accomId }
 
@@ -179,7 +180,7 @@ fun EditAccommodationScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -207,9 +208,9 @@ fun EditAccommodationScreen(
                     .padding(horizontal = 24.dp)
                     .padding(top = 16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -232,9 +233,9 @@ fun EditAccommodationScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 CurrencyPicker(
@@ -262,9 +263,9 @@ fun EditAccommodationScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 FilledIconButton(
@@ -272,8 +273,8 @@ fun EditAccommodationScreen(
                     enabled = accomLocation.isNotBlank(),
                     modifier = Modifier.height(56.dp).width(56.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = DraculaPurple,
-                        contentColor = DraculaForeground,
+                        containerColor = colors.primary,
+                        contentColor = colors.foreground,
                     )
                 ) {
                     Icon(Icons.Default.Search, contentDescription = "Search location")
@@ -309,7 +310,7 @@ fun EditAccommodationScreen(
             Text(
                 text = "Select dates (only trip dates available)",
                 fontSize = 14.sp,
-                color = DraculaComment,
+                color = colors.comment,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
 
@@ -331,10 +332,10 @@ fun EditAccommodationScreen(
                 },
                 colors = DatePickerDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    selectedDayContainerColor = DraculaPurple,
-                    todayDateBorderColor = DraculaPurple,
-                    dayInSelectionRangeContainerColor = DraculaPurple.copy(alpha = .25f),
-                    todayContentColor = DraculaPurple,
+                    selectedDayContainerColor = colors.primary,
+                    todayDateBorderColor = colors.primary,
+                    dayInSelectionRangeContainerColor = colors.primary.copy(alpha = .25f),
+                    todayContentColor = colors.primary,
                 ),
             )
 

@@ -11,18 +11,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.traveltool.MainActivity
 import com.example.traveltool.data.ApiKeyStore
+import com.example.traveltool.data.ThemeStore
 import com.example.traveltool.ui.theme.*
 
 /**
- * General settings screen for AI configuration.
+ * General settings screen for AI configuration and theme.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val colors = LocalAppColors.current
     var apiKey by remember { mutableStateOf(ApiKeyStore.getOpenAiKey(context)) }
     var model by remember { mutableStateOf(ApiKeyStore.getOpenAiModel(context)) }
+    var selectedTheme by remember { mutableStateOf(ThemeStore.getTheme(context)) }
 
     val availableModels = listOf(
         "gpt-4o-mini",
@@ -53,17 +57,55 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // ── Theme Selection ─────────────────────────
+            Text(
+                text = "Theme",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.primary,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ThemeStore.ThemeChoice.entries.forEach { theme ->
+                    FilterChip(
+                        selected = selectedTheme == theme,
+                        onClick = {
+                            selectedTheme = theme
+                            ThemeStore.setTheme(context, theme)
+                            // Update the activity's theme immediately
+                            (context as? MainActivity)?.let { it.themeChoice = theme }
+                        },
+                        label = {
+                            Text(when (theme) {
+                                ThemeStore.ThemeChoice.DRACULA -> "🧛 Dracula"
+                                ThemeStore.ThemeChoice.DARK    -> "🌙 Dark"
+                                ThemeStore.ThemeChoice.BRIGHT  -> "☀️ Bright"
+                            })
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.primary.copy(alpha = 0.3f),
+                            selectedLabelColor = colors.foreground,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            HorizontalDivider(color = colors.current)
+
+            // ── AI Settings ─────────────────────────────
             Text(
                 text = "AI Settings",
                 style = MaterialTheme.typography.titleMedium,
-                color = DraculaPurple,
+                color = colors.primary,
             )
 
-            // API Key
             Text(
                 text = "This key is used for AI-powered features like toll finding. It is stored encrypted on your device.",
                 style = MaterialTheme.typography.bodySmall,
-                color = DraculaComment,
+                color = colors.comment,
             )
             OutlinedTextField(
                 value = apiKey,
@@ -74,9 +116,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -84,7 +126,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             Text(
                 text = "Model",
                 style = MaterialTheme.typography.bodyMedium,
-                color = DraculaForeground,
+                color = colors.foreground,
             )
             var expanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
@@ -101,8 +143,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                         .fillMaxWidth(),
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
                     )
                 )
                 ExposedDropdownMenu(
@@ -141,7 +183,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onBack()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = DraculaGreen, contentColor = DraculaBackground),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.green,
+                    contentColor = colors.background,
+                ),
             ) {
                 Text("Save")
             }

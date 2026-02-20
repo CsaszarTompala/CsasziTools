@@ -48,6 +48,7 @@ fun EditActivityScreen(
     tripViewModel: TripViewModel,
     onBack: () -> Unit,
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
     val activity = trip?.activities?.find { it.id == activityId }
     if (trip == null || activity == null) { onBack(); return }
@@ -94,15 +95,67 @@ fun EditActivityScreen(
 
     // Determine "from" location (previous activity or accommodation)
     val existingActivities = tripViewModel.getActivitiesForDay(tripId, activity.dayMillis)
-    val prevActivity = existingActivities.filter { it.orderIndex < activity.orderIndex }.maxByOrNull { it.orderIndex }
     val todayAccom = trip.accommodations.find {
         it.startMillis <= activity.dayMillis && activity.dayMillis < it.endMillis
     } ?: trip.accommodations.find {
         it.startMillis <= activity.dayMillis && activity.dayMillis <= it.endMillis
     }
-    val fromLocation = prevActivity?.location
-        ?: todayAccom?.location?.ifBlank { trip.startingPoint }
-        ?: trip.startingPoint
+
+    // Previous day accommodation (for moving day detection)
+    val prevDayAccom = remember(trip.accommodations, activity.dayMillis) {
+        if (activity.dayMillis > trip.startMillis) {
+            val prevDay = activity.dayMillis - 24 * 60 * 60 * 1000L
+            trip.accommodations.find { it.startMillis <= prevDay && prevDay < it.endMillis }
+                ?: trip.accommodations.find { it.startMillis <= prevDay && prevDay <= it.endMillis }
+        } else null
+    }
+
+    val isFinalDay = activity.dayMillis >= trip.endMillis
+    val isMovingDay = remember(todayAccom, prevDayAccom, activity.dayMillis, trip.startMillis, trip.endMillis) {
+        when {
+            activity.dayMillis == trip.startMillis -> true
+            isFinalDay -> true
+            todayAccom == null -> false
+            prevDayAccom == null -> true
+            prevDayAccom.location != todayAccom.location -> true
+            else -> false
+        }
+    }
+
+    // Travel day position (preserve existing value)
+    var selectedPosition by remember { mutableStateOf(activity.travelDayPosition.ifBlank { TravelDayPosition.AFTER_ARRIVAL.name }) }
+
+    val originLocation = when {
+        activity.dayMillis == trip.startMillis -> trip.startingPoint
+        prevDayAccom != null -> prevDayAccom.location
+        todayAccom != null -> todayAccom.location
+        else -> trip.startingPoint
+    }
+    val destLocation = when {
+        isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint }
+        todayAccom != null -> todayAccom.location
+        else -> trip.startingPoint
+    }
+
+    val prevActivity = if (isMovingDay) {
+        val sameGroup = existingActivities.filter {
+            if (selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name)
+                it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+            else
+                it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
+        }.filter { it.orderIndex < activity.orderIndex }
+        sameGroup.maxByOrNull { it.orderIndex }
+    } else {
+        existingActivities.filter { it.orderIndex < activity.orderIndex }.maxByOrNull { it.orderIndex }
+    }
+
+    val fromLocation = if (isMovingDay) {
+        prevActivity?.location ?: if (selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name) originLocation else destLocation
+    } else {
+        prevActivity?.location
+            ?: todayAccom?.location?.ifBlank { trip.startingPoint }
+            ?: trip.startingPoint
+    }
 
     fun searchLocation() {
         if (location.isBlank()) return
@@ -142,7 +195,7 @@ fun EditActivityScreen(
                         showDeleteDialog = false
                         onBack()
                     },
-                    colors = ButtonDefaults.textButtonColors(contentColor = DraculaRed),
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.red),
                 ) {
                     Text("Delete")
                 }
@@ -169,7 +222,7 @@ fun EditActivityScreen(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete",
-                            tint = DraculaRed,
+                            tint = colors.red,
                         )
                     }
                 },
@@ -195,17 +248,60 @@ fun EditActivityScreen(
                             isSaving = true
                             val apiKey = ApiKeyStore.getOpenAiKey(context)
                             val model = ApiKeyStore.getOpenAiModel(context)
+                            val googleKey = try {
+                                val appInfo = context.packageManager.getApplicationInfo(
+                                    context.packageName,
+                                    android.content.pm.PackageManager.GET_META_DATA
+                                )
+                                appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+                            } catch (_: Exception) { "" }
                             scope.launch {
                                 // Recalculate driving time if location changed
-                                val drivingTo = if (locationChanged && apiKey.isNotBlank() && fromLocation.isNotBlank()) {
-                                    DirectionsApiHelper.estimateDrivingTime(
+                                var drivingTo: Int? = activity.drivingTimeToMinutes
+                                var drivingDistTo: Double? = activity.drivingDistanceToKm
+                                var returnTime: Int? = activity.returnDrivingTimeMinutes
+                                var returnDist: Double? = activity.returnDrivingDistanceKm
+
+                                if (locationChanged && fromLocation.isNotBlank()) {
+                                    val est = DirectionsApiHelper.estimateDrivingTime(
                                         from = fromLocation,
                                         to = location.trim(),
+                                        googleApiKey = googleKey,
                                         openAiApiKey = apiKey,
                                         model = model,
                                     )
-                                } else {
-                                    activity.drivingTimeToMinutes
+                                    drivingTo = est?.timeMinutes
+                                    drivingDistTo = est?.distanceKm
+                                }
+
+                                // Recalculate return drive if this is the last activity in its group and location changed
+                                val sameGroupActivities = if (isMovingDay) {
+                                    existingActivities.filter {
+                                        if (selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name)
+                                            it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                                        else
+                                            it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
+                                    }
+                                } else existingActivities
+                                val isLastInGroup = sameGroupActivities.none { it.orderIndex > activity.orderIndex }
+                                if (isLastInGroup && locationChanged) {
+                                    val returnTo = if (isFinalDay) {
+                                        trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { null } }
+                                    } else {
+                                        todayAccom?.location?.ifBlank { null }
+                                            ?: trip.startingPoint.ifBlank { null }
+                                    }
+                                    if (apiKey.isNotBlank() && returnTo != null) {
+                                        val retEst = DirectionsApiHelper.estimateDrivingTime(
+                                            from = location.trim(),
+                                            to = returnTo,
+                                            googleApiKey = googleKey,
+                                            openAiApiKey = apiKey,
+                                            model = model,
+                                        )
+                                        returnTime = retEst?.timeMinutes
+                                        returnDist = retEst?.distanceKm
+                                    }
                                 }
 
                                 val updated = activity.copy(
@@ -213,9 +309,13 @@ fun EditActivityScreen(
                                     location = location.trim(),
                                     durationMinutes = durationMinutes,
                                     drivingTimeToMinutes = drivingTo,
+                                    drivingDistanceToKm = drivingDistTo,
+                                    returnDrivingTimeMinutes = returnTime,
+                                    returnDrivingDistanceKm = returnDist,
                                     description = description.trim(),
                                     category = selectedCategory,
                                     eatingType = selectedEatingType,
+                                    travelDayPosition = if (isMovingDay) selectedPosition else "",
                                 )
                                 tripViewModel.updateActivity(tripId, updated)
                                 isSaving = false
@@ -227,7 +327,7 @@ fun EditActivityScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -257,68 +357,37 @@ fun EditActivityScreen(
         ) {
             Spacer(Modifier.height(12.dp))
 
-            // ── Category selection ──
-            Text(
-                text = "Category",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = DraculaForeground,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ActivityCategory.entries.forEach { cat ->
+            // ── Travel day position picker (only on moving days) ──
+            if (isMovingDay) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     FilterChip(
-                        selected = selectedCategory == cat.name,
-                        onClick = {
-                            selectedCategory = if (selectedCategory == cat.name) "" else cat.name
-                            if (selectedCategory != ActivityCategory.EATING.name) selectedEatingType = ""
-                        },
-                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 13.sp) },
+                        selected = selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name,
+                        onClick = { selectedPosition = TravelDayPosition.BEFORE_ARRIVAL.name },
+                        label = { Text("\uD83D\uDEE3\uFE0F On the way") },
+                        modifier = Modifier.weight(1f),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = DraculaPurple.copy(alpha = 0.3f),
-                            selectedLabelColor = DraculaForeground,
+                            selectedContainerColor = colors.orange.copy(alpha = 0.2f),
+                            selectedLabelColor = colors.orange,
+                        ),
+                    )
+                    FilterChip(
+                        selected = selectedPosition == TravelDayPosition.AFTER_ARRIVAL.name,
+                        onClick = { selectedPosition = TravelDayPosition.AFTER_ARRIVAL.name },
+                        label = { Text("\uD83C\uDFE8 After arrival") },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.green.copy(alpha = 0.2f),
+                            selectedLabelColor = colors.green,
                         ),
                     )
                 }
-            }
-
-            // Eating sub-selection
-            if (selectedCategory == ActivityCategory.EATING.name) {
                 Spacer(Modifier.height(8.dp))
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    EatingType.entries.forEach { et ->
-                        FilterChip(
-                            selected = selectedEatingType == et.name,
-                            onClick = {
-                                selectedEatingType = if (selectedEatingType == et.name) "" else et.name
-                            },
-                            label = { Text(et.label, fontSize = 13.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DraculaCyan.copy(alpha = 0.3f),
-                                selectedLabelColor = DraculaForeground,
-                            ),
-                        )
-                    }
-                }
             }
-
-            Spacer(Modifier.height(16.dp))
 
             // --- Activity name ---
             OutlinedTextField(
@@ -330,9 +399,9 @@ fun EditActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -354,9 +423,9 @@ fun EditActivityScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 FilledIconButton(
@@ -364,8 +433,8 @@ fun EditActivityScreen(
                     enabled = location.isNotBlank(),
                     modifier = Modifier.height(56.dp).width(56.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = DraculaPurple,
-                        contentColor = DraculaForeground,
+                        containerColor = colors.primary,
+                        contentColor = colors.foreground,
                     )
                 ) {
                     Icon(Icons.Default.Search, contentDescription = "Search location")
@@ -376,7 +445,7 @@ fun EditActivityScreen(
                 Text(
                     text = "Location changed — driving time will be re-estimated on save.",
                     fontSize = 11.sp,
-                    color = DraculaOrange,
+                    color = colors.orange,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
                 )
             }
@@ -417,9 +486,9 @@ fun EditActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -436,9 +505,9 @@ fun EditActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -451,17 +520,17 @@ fun EditActivityScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    colors = CardDefaults.cardColors(containerColor = colors.current),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Current driving time", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaPurple)
+                        Text("Current driving time", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                         Spacer(Modifier.height(8.dp))
                         val h = activity.drivingTimeToMinutes / 60
                         val m = activity.drivingTimeToMinutes % 60
                         Text(
                             text = "\uD83D\uDE97 ${if (h > 0) "${h}h " else ""}${m}min from ${fromLocation.take(30)}${if (fromLocation.length > 30) "\u2026" else ""}",
                             fontSize = 13.sp,
-                            color = DraculaGreen,
+                            color = colors.green,
                         )
                     }
                 }
@@ -475,7 +544,7 @@ fun EditActivityScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    colors = CardDefaults.cardColors(containerColor = colors.current),
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -486,7 +555,7 @@ fun EditActivityScreen(
                         Text(
                             text = "Rating: ${String.format(Locale.US, "%.1f", activity.rating)}",
                             fontSize = 14.sp,
-                            color = DraculaYellow,
+                            color = colors.yellow,
                         )
                     }
                 }

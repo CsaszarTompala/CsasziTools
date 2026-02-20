@@ -78,7 +78,14 @@ private fun calculateTotalTripCost(trip: Trip, eurRates: Map<String, Double>, tr
 
     // Fuel cost (if estimated distance + consumption + price are all available)
     if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
-        val litres = (trip.estimatedDrivingDistanceKm / 100.0) * trip.fuelConsumption
+        // Main trip route distance
+        var totalKm = trip.estimatedDrivingDistanceKm!!
+        // Add activity-related driving distances (to each activity + return from last)
+        trip.activities.forEach { act ->
+            totalKm += act.drivingDistanceToKm ?: 0.0
+            totalKm += act.returnDrivingDistanceKm ?: 0.0
+        }
+        val litres = (totalKm / 100.0) * trip.fuelConsumption
         val fuelCost = litres * trip.fuelPricePerLiter
         total += CurrencyManager.convert(fuelCost, trip.fuelPriceCurrency, trip.displayCurrency, eurRates)
     }
@@ -101,6 +108,7 @@ fun TripDetailScreen(
     onCurrencySettings: (String) -> Unit,
     onSpendings: (String) -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -121,6 +129,9 @@ fun TripDetailScreen(
     var showStartingPointDialog by remember { mutableStateOf(false) }
     var newStartingPoint by remember { mutableStateOf(trip.startingPoint) }
 
+    var showEndingPointDialog by remember { mutableStateOf(false) }
+    var newEndingPoint by remember { mutableStateOf(trip.endingPoint) }
+
     var showCurrencyDialog by remember { mutableStateOf(false) }
 
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
@@ -135,13 +146,20 @@ fun TripDetailScreen(
     }
 
     // Location permission launcher for "Detect my location"
+    // Track which dialog triggered the permission request
+    var locationDetectTarget by remember { mutableStateOf("start") }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             detectCurrentLocation(context, scope) { detected ->
-                newStartingPoint = detected
-                tripViewModel.updateTrip(trip.copy(startingPoint = detected))
+                if (locationDetectTarget == "start") {
+                    newStartingPoint = detected
+                    tripViewModel.updateTrip(trip.copy(startingPoint = detected))
+                } else {
+                    newEndingPoint = detected
+                    tripViewModel.updateTrip(trip.copy(endingPoint = detected))
+                }
             }
         }
     }
@@ -163,7 +181,7 @@ fun TripDetailScreen(
                             Icon(
                                 Icons.Default.Warning,
                                 contentDescription = "Trip has warnings",
-                                tint = DraculaYellow,
+                                tint = colors.yellow,
                                 modifier = Modifier.size(20.dp),
                             )
                         }
@@ -199,19 +217,19 @@ fun TripDetailScreen(
                 Text(
                     text = "$startDate – $endDate",
                     fontSize = 14.sp,
-                    color = DraculaOrange,
+                    color = colors.orange,
                 )
                 if (trip.location.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "📍 ${trip.location}",
                         fontSize = 14.sp,
-                        color = DraculaComment,
+                        color = colors.comment,
                     )
                 }
             }
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Total Cost Summary ---
             Card(
@@ -219,27 +237,27 @@ fun TripDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DraculaPurple.copy(alpha = 0.15f)),
+                colors = CardDefaults.cardColors(containerColor = colors.primary.copy(alpha = 0.15f)),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Trip Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaPurple)
+                    Text("Total Trip Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "💰 %.2f %s".format(totalCost, trip.displayCurrency),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = DraculaGreen,
+                        color = colors.green,
                     )
                     Spacer(Modifier.height(4.dp))
-                    Text("Based on accommodations, tolls, tickets, fees, fuel & spendings", fontSize = 11.sp, color = DraculaComment)
+                    Text("Based on accommodations, tolls, tickets, fees, fuel & spendings", fontSize = 11.sp, color = colors.comment)
                 }
             }
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
-            // --- Starting Point ---
+            // --- Start Point ---
             SettingsRow(
-                title = "Starting Point",
+                title = "Start Point",
                 subtitle = trip.startingPoint.ifBlank { "Not set" },
                 onClick = {
                     newStartingPoint = trip.startingPoint
@@ -247,7 +265,19 @@ fun TripDetailScreen(
                 }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
+
+            // --- End Point ---
+            SettingsRow(
+                title = "End Point",
+                subtitle = trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "Not set" } },
+                onClick = {
+                    newEndingPoint = trip.endingPoint.ifBlank { trip.startingPoint }
+                    showEndingPointDialog = true
+                }
+            )
+
+            HorizontalDivider(color = colors.current)
 
             // --- Accommodation ---
             SettingsRow(
@@ -257,7 +287,7 @@ fun TripDetailScreen(
                 onClick = { onAccommodation(tripId) }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Travel Mode ---
             SettingsRow(
@@ -270,7 +300,7 @@ fun TripDetailScreen(
                 onClick = { onTravelSettings(tripId) }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Daily Activities ---
             SettingsRow(
@@ -279,7 +309,7 @@ fun TripDetailScreen(
                 onClick = { onDailyActivities(tripId) }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Spendings ---
             SettingsRow(
@@ -288,7 +318,7 @@ fun TripDetailScreen(
                 onClick = { onSpendings(tripId) }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Display Currency ---
             SettingsRow(
@@ -297,7 +327,7 @@ fun TripDetailScreen(
                 onClick = { showCurrencyDialog = true }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // --- Currencies & Exchange Rates ---
             SettingsRow(
@@ -306,7 +336,7 @@ fun TripDetailScreen(
                 onClick = { onCurrencySettings(tripId) }
             )
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
         }
     }
 
@@ -323,9 +353,9 @@ fun TripDetailScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
             },
@@ -337,14 +367,14 @@ fun TripDetailScreen(
                             showRenameDialog = false
                         }
                     }
-                ) { Text("OK", color = DraculaGreen) }
+                ) { Text("OK", color = colors.green) }
             },
             dismissButton = {
                 TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 
@@ -371,28 +401,28 @@ fun TripDetailScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DraculaPurple,
-                            focusedLabelColor = DraculaPurple,
-                            cursorColor = DraculaPurple,
+                            focusedBorderColor = colors.primary,
+                            focusedLabelColor = colors.primary,
+                            cursorColor = colors.primary,
                         )
                     )
                     Spacer(Modifier.height(16.dp))
-                    Text("Start Date", fontSize = 13.sp, color = DraculaComment)
+                    Text("Start Date", fontSize = 13.sp, color = colors.comment)
                     Spacer(Modifier.height(4.dp))
                     OutlinedButton(
                         onClick = { showStartDatePicker = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("📅 $editStartStr", color = DraculaOrange)
+                        Text("📅 $editStartStr", color = colors.orange)
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("End Date", fontSize = 13.sp, color = DraculaComment)
+                    Text("End Date", fontSize = 13.sp, color = colors.comment)
                     Spacer(Modifier.height(4.dp))
                     OutlinedButton(
                         onClick = { showEndDatePicker = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("📅 $editEndStr", color = DraculaOrange)
+                        Text("📅 $editEndStr", color = colors.orange)
                     }
                 }
             },
@@ -410,14 +440,14 @@ fun TripDetailScreen(
                             showDatesDialog = false
                         }
                     }
-                ) { Text("OK", color = DraculaGreen) }
+                ) { Text("OK", color = colors.green) }
             },
             dismissButton = {
                 TextButton(onClick = { showDatesDialog = false }) { Text("Cancel") }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
 
         // Start date picker
@@ -431,21 +461,21 @@ fun TripDetailScreen(
                     TextButton(onClick = {
                         startPickerState.selectedDateMillis?.let { editStartMillis = it }
                         showStartDatePicker = false
-                    }) { Text("OK", color = DraculaGreen) }
+                    }) { Text("OK", color = colors.green) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
                 },
-                colors = DatePickerDefaults.colors(containerColor = DraculaCurrent),
+                colors = DatePickerDefaults.colors(containerColor = colors.current),
             ) {
                 DatePicker(
                     state = startPickerState,
                     showModeToggle = false,
                     colors = DatePickerDefaults.colors(
-                        containerColor = DraculaCurrent,
-                        selectedDayContainerColor = DraculaPurple,
-                        todayDateBorderColor = DraculaPurple,
-                        todayContentColor = DraculaPurple,
+                        containerColor = colors.current,
+                        selectedDayContainerColor = colors.primary,
+                        todayDateBorderColor = colors.primary,
+                        todayContentColor = colors.primary,
                     ),
                 )
             }
@@ -462,45 +492,45 @@ fun TripDetailScreen(
                     TextButton(onClick = {
                         endPickerState.selectedDateMillis?.let { editEndMillis = it }
                         showEndDatePicker = false
-                    }) { Text("OK", color = DraculaGreen) }
+                    }) { Text("OK", color = colors.green) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
                 },
-                colors = DatePickerDefaults.colors(containerColor = DraculaCurrent),
+                colors = DatePickerDefaults.colors(containerColor = colors.current),
             ) {
                 DatePicker(
                     state = endPickerState,
                     showModeToggle = false,
                     colors = DatePickerDefaults.colors(
-                        containerColor = DraculaCurrent,
-                        selectedDayContainerColor = DraculaPurple,
-                        todayDateBorderColor = DraculaPurple,
-                        todayContentColor = DraculaPurple,
+                        containerColor = colors.current,
+                        selectedDayContainerColor = colors.primary,
+                        todayDateBorderColor = colors.primary,
+                        todayContentColor = colors.primary,
                     ),
                 )
             }
         }
     }
 
-    // --- Starting Point dialog ---
+    // --- Start Point dialog ---
     if (showStartingPointDialog) {
         AlertDialog(
             onDismissRequest = { showStartingPointDialog = false },
-            title = { Text("Starting Point") },
+            title = { Text("Start Point") },
             text = {
                 Column {
                     OutlinedTextField(
                         value = newStartingPoint,
                         onValueChange = { newStartingPoint = it },
-                        label = { Text("Starting point") },
+                        label = { Text("Start point") },
                         placeholder = { Text("e.g. Budapest, Hungary") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DraculaPurple,
-                            focusedLabelColor = DraculaPurple,
-                            cursorColor = DraculaPurple,
+                            focusedBorderColor = colors.primary,
+                            focusedLabelColor = colors.primary,
+                            cursorColor = colors.primary,
                         )
                     )
                     Spacer(Modifier.height(12.dp))
@@ -514,12 +544,13 @@ fun TripDetailScreen(
                                     newStartingPoint = detected
                                 }
                             } else {
+                                locationDetectTarget = "start"
                                 permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("📍 Detect my location", color = DraculaCyan)
+                        Text("📍 Detect my location", color = colors.accent)
                     }
                 }
             },
@@ -529,14 +560,79 @@ fun TripDetailScreen(
                         tripViewModel.updateTrip(trip.copy(startingPoint = newStartingPoint.trim()))
                         showStartingPointDialog = false
                     }
-                ) { Text("OK", color = DraculaGreen) }
+                ) { Text("OK", color = colors.green) }
             },
             dismissButton = {
                 TextButton(onClick = { showStartingPointDialog = false }) { Text("Cancel") }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
+        )
+    }
+
+    // --- End Point dialog ---
+    if (showEndingPointDialog) {
+        AlertDialog(
+            onDismissRequest = { showEndingPointDialog = false },
+            title = { Text("End Point") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newEndingPoint,
+                        onValueChange = { newEndingPoint = it },
+                        label = { Text("End point") },
+                        placeholder = { Text("e.g. Budapest, Hungary") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colors.primary,
+                            focusedLabelColor = colors.primary,
+                            cursorColor = colors.primary,
+                        )
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val hasPerm = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                detectCurrentLocation(context, scope) { detected ->
+                                    newEndingPoint = detected
+                                }
+                            } else {
+                                locationDetectTarget = "end"
+                                permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("📍 Detect my location", color = colors.accent)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { newEndingPoint = trip.startingPoint },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("📋 Same as start point", color = colors.accent)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        tripViewModel.updateTrip(trip.copy(endingPoint = newEndingPoint.trim()))
+                        showEndingPointDialog = false
+                    }
+                ) { Text("OK", color = colors.green) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndingPointDialog = false }) { Text("Cancel") }
+            },
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 
@@ -548,7 +644,7 @@ fun TripDetailScreen(
             title = { Text("Display Currency") },
             text = {
                 Column {
-                    Text("Select the currency for trip totals.", fontSize = 13.sp, color = DraculaComment)
+                    Text("Select the currency for trip totals.", fontSize = 13.sp, color = colors.comment)
                     Spacer(Modifier.height(12.dp))
                     currencyList.forEach { code ->
                         Row(
@@ -567,10 +663,10 @@ fun TripDetailScreen(
                                     tripViewModel.updateTrip(trip.copy(displayCurrency = code))
                                     showCurrencyDialog = false
                                 },
-                                colors = RadioButtonDefaults.colors(selectedColor = DraculaPurple),
+                                colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(code, fontSize = 16.sp, color = DraculaForeground)
+                            Text(code, fontSize = 16.sp, color = colors.foreground)
                         }
                     }
                 }
@@ -579,9 +675,9 @@ fun TripDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showCurrencyDialog = false }) { Text("Close") }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 }
@@ -593,6 +689,7 @@ private fun SettingsRow(
     showWarning: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -606,14 +703,14 @@ private fun SettingsRow(
                     text = title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = DraculaForeground,
+                    color = colors.foreground,
                 )
                 if (showWarning) {
                     Spacer(Modifier.width(6.dp))
                     Icon(
                         Icons.Default.Warning,
                         contentDescription = "Warning",
-                        tint = DraculaYellow,
+                        tint = colors.yellow,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -622,13 +719,13 @@ private fun SettingsRow(
             Text(
                 text = subtitle,
                 fontSize = 13.sp,
-                color = DraculaComment,
+                color = colors.comment,
             )
         }
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = DraculaComment,
+            tint = colors.comment,
         )
     }
 }

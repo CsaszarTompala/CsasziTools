@@ -34,6 +34,7 @@ fun AccommodationListScreen(
     onEditAccommodation: (tripId: String, accomId: String) -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -76,7 +77,7 @@ fun AccommodationListScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -96,7 +97,7 @@ fun AccommodationListScreen(
                     text = "\"${trip.name}\" Accommodations",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = DraculaPurple,
+                    color = colors.primary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                 )
             }
@@ -106,7 +107,7 @@ fun AccommodationListScreen(
                     Text(
                         text = "No accommodations yet.",
                         fontSize = 14.sp,
-                        color = DraculaComment,
+                        color = colors.comment,
                         modifier = Modifier.padding(horizontal = 24.dp),
                     )
                 }
@@ -143,7 +144,7 @@ fun AccommodationListScreen(
                         accomToDelete = null
                     }
                 ) {
-                    Text("Delete", color = DraculaRed)
+                    Text("Delete", color = colors.red)
                 }
             },
             dismissButton = {
@@ -151,9 +152,9 @@ fun AccommodationListScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 }
@@ -164,6 +165,7 @@ private fun AccommodationCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
     val startDate = remember(accom.startMillis) {
         if (accom.startMillis > 0) dateFormat.format(Date(accom.startMillis)) else "—"
@@ -179,7 +181,7 @@ private fun AccommodationCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = DraculaCurrent,
+            containerColor = colors.current,
         ),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -192,13 +194,13 @@ private fun AccommodationCard(
                     text = accom.name.ifBlank { "(No name)" },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DraculaForeground,
+                    color = colors.foreground,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "$startDate – $endDate",
                     fontSize = 14.sp,
-                    color = DraculaOrange,
+                    color = colors.orange,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -207,14 +209,14 @@ private fun AccommodationCard(
                     else
                         "💰 Price not set",
                     fontSize = 14.sp,
-                    color = if (accom.pricePerNight != null) DraculaGreen else DraculaComment,
+                    color = if (accom.pricePerNight != null) colors.green else colors.comment,
                 )
                 if (accom.location.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "📍 ${accom.location}",
                         fontSize = 13.sp,
-                        color = DraculaComment,
+                        color = colors.comment,
                     )
                 }
             }
@@ -230,7 +232,7 @@ private fun AccommodationCard(
                     Icon(
                         Icons.Default.Warning,
                         contentDescription = "Incomplete accommodation",
-                        tint = DraculaYellow,
+                        tint = colors.yellow,
                         modifier = Modifier.padding(4.dp).size(20.dp),
                     )
                 }
@@ -238,7 +240,7 @@ private fun AccommodationCard(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Delete accommodation",
-                        tint = DraculaRed,
+                        tint = colors.red,
                         modifier = Modifier.size(18.dp),
                     )
                 }

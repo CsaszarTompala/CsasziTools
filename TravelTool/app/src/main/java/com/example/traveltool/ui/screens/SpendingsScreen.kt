@@ -34,6 +34,7 @@ fun SpendingsScreen(
     tripViewModel: TripViewModel,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -81,13 +82,13 @@ fun SpendingsScreen(
                     text = "Daily Spendings",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = DraculaPurple,
+                    color = colors.primary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                 )
                 Text(
                     text = "Spending per day (e.g. food, activities)",
                     fontSize = 12.sp,
-                    color = DraculaComment,
+                    color = colors.comment,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
                 )
                 Spacer(Modifier.height(8.dp))
@@ -95,7 +96,7 @@ fun SpendingsScreen(
 
             if (trip.dailySpendings.isEmpty()) {
                 item {
-                    Text("No daily spendings yet.", fontSize = 14.sp, color = DraculaComment,
+                    Text("No daily spendings yet.", fontSize = 14.sp, color = colors.comment,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 }
             }
@@ -126,18 +127,18 @@ fun SpendingsScreen(
 
             // ── Other Spendings ────────────────────
             item {
-                HorizontalDivider(color = DraculaCurrent)
+                HorizontalDivider(color = colors.current)
                 Text(
                     text = "Other Spendings",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = DraculaPurple,
+                    color = colors.primary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                 )
                 Text(
                     text = "One-time or total expenses",
                     fontSize = 12.sp,
-                    color = DraculaComment,
+                    color = colors.comment,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
                 )
                 Spacer(Modifier.height(8.dp))
@@ -145,7 +146,7 @@ fun SpendingsScreen(
 
             if (trip.otherSpendings.isEmpty()) {
                 item {
-                    Text("No other spendings yet.", fontSize = 14.sp, color = DraculaComment,
+                    Text("No other spendings yet.", fontSize = 14.sp, color = colors.comment,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 }
             }
@@ -236,24 +237,25 @@ private fun SpendingCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 4.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+        colors = CardDefaults.cardColors(containerColor = colors.current),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = DraculaForeground)
-                Text("💰 $amount $currency ($amountLabel)", fontSize = 13.sp, color = DraculaGreen)
+                Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.foreground)
+                Text("💰 $amount $currency ($amountLabel)", fontSize = 13.sp, color = colors.green)
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Delete", tint = DraculaRed, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, "Delete", tint = colors.red, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -270,6 +272,7 @@ private fun SpendingEditDialog(
     onConfirm: (name: String, amount: Double, currency: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val colors = LocalAppColors.current
     var name by remember { mutableStateOf(initialName) }
     var amountText by remember { mutableStateOf(initialAmount) }
     var currency by remember { mutableStateOf(initialCurrency) }
@@ -287,7 +290,7 @@ private fun SpendingEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary, focusedLabelColor = colors.primary, cursorColor = colors.primary,
                     )
                 )
                 Spacer(Modifier.height(12.dp))
@@ -301,7 +304,7 @@ private fun SpendingEditDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
+                            focusedBorderColor = colors.primary, focusedLabelColor = colors.primary, cursorColor = colors.primary,
                         )
                     )
                     CurrencyPicker(selected = currency, currencies = currencies, onSelect = { currency = it })
@@ -315,10 +318,10 @@ private fun SpendingEditDialog(
                         onConfirm(name.trim(), amountText.toDoubleOrNull() ?: 0.0, currency)
                     }
                 }
-            ) { Text("OK", color = DraculaGreen) }
+            ) { Text("OK", color = colors.green) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+        containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
     )
 }
 
@@ -329,13 +332,14 @@ private fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text("Delete \"${itemName.ifBlank { "(unnamed)" }}\"?") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = DraculaRed) } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = colors.red) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+        containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
     )
 }
 

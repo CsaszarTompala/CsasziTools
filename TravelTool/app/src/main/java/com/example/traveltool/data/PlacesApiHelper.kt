@@ -43,9 +43,12 @@ object PlacesApiHelper {
      * Search for nearby places matching a query near [nearLocation].
      *
      * @param query        Search keywords, e.g. "hiking trails"
-     * @param nearLocation The location name to search near (geocoded by Places API)
+     * @param nearLocation The location name to search near (used in text query)
      * @param apiKey       Google Maps / Places API key
      * @param maxResults   Maximum results to return (default 10)
+     * @param latitude     Optional latitude for location bias (preferred over name-only search)
+     * @param longitude    Optional longitude for location bias (preferred over name-only search)
+     * @param radiusMeters Radius in metres for the location bias circle (default 30 km)
      * @return List of [PlaceResult]
      */
     suspend fun searchPlaces(
@@ -53,16 +56,35 @@ object PlacesApiHelper {
         nearLocation: String,
         apiKey: String,
         maxResults: Int = 10,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        radiusMeters: Double = 30_000.0,
     ): List<PlaceResult> = withContext(Dispatchers.IO) {
         if (query.isBlank() || apiKey.isBlank()) return@withContext emptyList()
 
-        val textQuery = "$query near $nearLocation"
+        // When coordinates are available, use them as locationBias so the API
+        // doesn't guess the wrong city (e.g. Naples IT vs Naples FL).
+        val textQuery = if (latitude != null && longitude != null) {
+            query // coordinates disambiguate — no need to append the name
+        } else {
+            "$query near $nearLocation"
+        }
+
+        val locationBiasJson = if (latitude != null && longitude != null) {
+            """,
+            "locationBias": {
+                "circle": {
+                    "center": { "latitude": $latitude, "longitude": $longitude },
+                    "radius": $radiusMeters
+                }
+            }"""
+        } else ""
 
         val requestBody = """
         {
             "textQuery": ${com.google.gson.Gson().toJson(textQuery)},
             "maxResultCount": $maxResults,
-            "languageCode": "en"
+            "languageCode": "en"$locationBiasJson
         }
         """.trimIndent()
 

@@ -19,6 +19,7 @@ fun CurrencyPicker(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
@@ -37,8 +38,8 @@ fun CurrencyPicker(
                 .width(100.dp),
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = DraculaPurple,
-                focusedLabelColor = DraculaPurple,
+                focusedBorderColor = colors.primary,
+                focusedLabelColor = colors.primary,
             ),
             textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
         )

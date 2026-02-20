@@ -17,6 +17,14 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
+ * Result of a driving time + distance estimation.
+ */
+data class DrivingEstimate(
+    val timeMinutes: Int,
+    val distanceKm: Double,
+)
+
+/**
  * Uses OpenAI GPT to identify tolls, vignettes, and road fees for a trip route.
  */
 object DirectionsApiHelper {
@@ -42,6 +50,7 @@ object DirectionsApiHelper {
      */
     suspend fun findTollsForTrip(
         startingPoint: String,
+        endingPoint: String = "",
         accommodations: List<Accommodation>,
         openAiApiKey: String,
         travelMode: TravelMode = TravelMode.CAR,
@@ -69,9 +78,10 @@ object DirectionsApiHelper {
                 waypoints.add(accom.location)
             }
         }
-        // Always append the return leg to the starting point
-        if (waypoints.size < 2 || waypoints.last() != startingPoint) {
-            waypoints.add(startingPoint)
+        // Always append the return leg to the ending point (or starting point if not set)
+        val returnTo = endingPoint.ifBlank { startingPoint }
+        if (waypoints.size < 2 || waypoints.last() != returnTo) {
+            waypoints.add(returnTo)
         }
 
         val routeDescription = waypoints.zipWithNext().mapIndexed { i, (a, b) ->
@@ -198,6 +208,7 @@ If there are no tolls at all, respond with: []"""
      */
     suspend fun estimateDrivingDistance(
         startingPoint: String,
+        endingPoint: String = "",
         accommodations: List<Accommodation>,
         openAiApiKey: String,
         travelMode: TravelMode = TravelMode.CAR,
@@ -219,8 +230,9 @@ If there are no tolls at all, respond with: []"""
                 waypoints.add(accom.location)
             }
         }
-        if (waypoints.size < 2 || waypoints.last() != startingPoint) {
-            waypoints.add(startingPoint)
+        val returnTo = endingPoint.ifBlank { startingPoint }
+        if (waypoints.size < 2 || waypoints.last() != returnTo) {
+            waypoints.add(returnTo)
         }
 
         val routeDescription = waypoints.zipWithNext().mapIndexed { i, (a, b) ->
@@ -347,19 +359,112 @@ Example: {"totalDistanceKm":1250,"legs":[{"from":"Budapest","to":"Vienna","dista
     }
 
     /**
-     * Estimate one-way driving time between two locations using OpenAI GPT.
-     * Returns the estimated driving time in minutes, or null on failure.
+     * Estimate one-way driving time between two locations using the Google Routes API
+     * (computeRoutes). Falls back to OpenAI GPT if the Routes API fails.
+     *
+     * The Google Routes API requires the **Routes API** to be enabled in the
+     * Google Cloud Console (the same project that holds the Maps / Places key).
+     *
+     * @param from           Origin location name (e.g. "Naples, Italy")
+     * @param to             Destination location name (e.g. "Monopoli, Italy")
+     * @param googleApiKey   Google Maps / Routes API key
+     * @param openAiApiKey   OpenAI API key (used only as fallback)
+     * @param model          OpenAI model (used only as fallback)
      */
     suspend fun estimateDrivingTime(
         from: String,
         to: String,
-        openAiApiKey: String,
+        googleApiKey: String = "",
+        openAiApiKey: String = "",
         model: String = "gpt-4o-mini"
-    ): Int? = withContext(Dispatchers.IO) {
-        if (from.isBlank() || to.isBlank() || openAiApiKey.isBlank()) {
+    ): DrivingEstimate? = withContext(Dispatchers.IO) {
+        if (from.isBlank() || to.isBlank()) {
             return@withContext null
         }
 
+        // ── Try Google Routes API first ──────────────────────────
+        if (googleApiKey.isNotBlank()) {
+            try {
+                val result = computeRouteGoogle(from, to, googleApiKey)
+                if (result != null) return@withContext result
+            } catch (e: Exception) {
+                Log.w(TAG, "Google Routes API failed, falling back to GPT: ${e.message}")
+            }
+        }
+
+        // ── Fallback: OpenAI GPT ─────────────────────────────────
+        if (openAiApiKey.isBlank()) return@withContext null
+        estimateDrivingTimeGpt(from, to, openAiApiKey, model)
+    }
+
+    /**
+     * Use Google Routes API (computeRoutes) to get real driving time & distance.
+     * Requires the "Routes API" enabled in the GCP project.
+     */
+    private suspend fun computeRouteGoogle(
+        from: String,
+        to: String,
+        apiKey: String,
+    ): DrivingEstimate? {
+        val routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes"
+
+        val requestBody = """
+        {
+            "origin": { "address": ${gson.toJson(from)} },
+            "destination": { "address": ${gson.toJson(to)} },
+            "travelMode": "DRIVE",
+            "routingPreference": "TRAFFIC_UNAWARE",
+            "units": "METRIC"
+        }
+        """.trimIndent()
+
+        val request = Request.Builder()
+            .url(routesUrl)
+            .header("Content-Type", "application/json")
+            .header("X-Goog-Api-Key", apiKey)
+            .header("X-Goog-FieldMask", "routes.duration,routes.distanceMeters")
+            .post(requestBody.toRequestBody(JSON_MEDIA))
+            .build()
+
+        Log.d(TAG, "Google Routes API: $from → $to")
+
+        val response = client.newCall(request).execute()
+        val body = response.body?.string() ?: ""
+
+        if (!response.isSuccessful) {
+            Log.w(TAG, "Google Routes API error ${response.code}: $body")
+            return null
+        }
+
+        val json = JsonParser.parseString(body).asJsonObject
+        val routes = json.getAsJsonArray("routes")
+        if (routes == null || routes.size() == 0) {
+            Log.w(TAG, "Google Routes API: no routes found")
+            return null
+        }
+
+        val route = routes[0].asJsonObject
+        // duration is a string like "15420s"
+        val durationStr = route.get("duration")?.asString ?: return null
+        val durationSeconds = durationStr.replace("s", "").toLongOrNull() ?: return null
+        val distanceMeters = route.get("distanceMeters")?.asInt ?: 0
+
+        val timeMinutes = (durationSeconds / 60).toInt()
+        val distanceKm = distanceMeters / 1000.0
+
+        Log.d(TAG, "Google Routes result: ${timeMinutes}min, ${distanceKm}km")
+        return DrivingEstimate(timeMinutes, distanceKm)
+    }
+
+    /**
+     * Fallback: Estimate one-way driving time between two locations using OpenAI GPT.
+     */
+    private suspend fun estimateDrivingTimeGpt(
+        from: String,
+        to: String,
+        openAiApiKey: String,
+        model: String = "gpt-4o-mini"
+    ): DrivingEstimate? {
         val prompt = """You are an expert on driving routes and travel times. Estimate the driving time by car from "$from" to "$to" using realistic highway/motorway routes.
 
 You MUST respond with ONLY a single JSON object. No text before or after. No markdown.
@@ -375,7 +480,7 @@ Example: {"drivingTimeMinutes":120,"distanceKm":150}"""
             ))
             val bodyJson = """{"model":"$model","messages":$messagesJson,"temperature":0.2,"max_tokens":200}"""
 
-            Log.d(TAG, "Estimating driving time from $from to $to...")
+            Log.d(TAG, "GPT fallback: estimating driving time from $from to $to...")
 
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/chat/completions")
@@ -388,13 +493,13 @@ Example: {"drivingTimeMinutes":120,"distanceKm":150}"""
             val responseBody = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Log.e(TAG, "API error ${response.code}: $responseBody")
-                return@withContext null
+                Log.e(TAG, "GPT API error ${response.code}: $responseBody")
+                return null
             }
 
             val json = JsonParser.parseString(responseBody).asJsonObject
             val choices = json.getAsJsonArray("choices")
-            if (choices == null || choices.size() == 0) return@withContext null
+            if (choices == null || choices.size() == 0) return null
 
             val content = choices[0].asJsonObject
                 .getAsJsonObject("message")
@@ -419,10 +524,14 @@ Example: {"drivingTimeMinutes":120,"distanceKm":150}"""
                 } else null
             }
 
-            resultJson?.get("drivingTimeMinutes")?.asInt
+            return resultJson?.let {
+                val time = it.get("drivingTimeMinutes")?.asInt
+                val dist = it.get("distanceKm")?.asDouble
+                if (time != null) DrivingEstimate(time, dist ?: 0.0) else null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Driving time estimation exception: ${e.message}", e)
-            null
+            Log.e(TAG, "GPT driving time estimation exception: ${e.message}", e)
+            return null
         }
     }
 }

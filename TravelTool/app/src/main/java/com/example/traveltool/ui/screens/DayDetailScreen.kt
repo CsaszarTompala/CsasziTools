@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.traveltool.data.Accommodation
 import com.example.traveltool.data.Activity
+import com.example.traveltool.data.TravelDayPosition
 import com.example.traveltool.data.SunriseSunsetApi
 import com.example.traveltool.data.TripViewModel
+import com.example.traveltool.ui.components.CompactTimePicker
 import com.example.traveltool.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,6 +47,7 @@ fun DayDetailScreen(
     onEditActivity: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
     if (trip == null) { onBack(); return }
 
@@ -80,10 +83,12 @@ fun DayDetailScreen(
     }
 
     // Determine if this is a moving day or staying day
-    val isMovingDay = remember(todayAccom, prevDayAccom, dayMillis, trip.startMillis) {
+    val isMovingDay = remember(todayAccom, prevDayAccom, dayMillis, trip.startMillis, trip.endMillis) {
         when {
             // First day of trip → always moving (traveling from home)
             dayMillis == trip.startMillis -> true
+            // Final day → returning home
+            dayMillis >= trip.endMillis -> true
             // No accommodation today → can't determine
             todayAccom == null -> false
             // Previous day had different accommodation (different location) → moving day
@@ -138,24 +143,13 @@ fun DayDetailScreen(
 
     // ── Day plan (departure time) ──
     val dayPlan = tripViewModel.getDayPlan(tripId, dayMillis)
-    val timePickerState = rememberTimePickerState(
-        initialHour = dayPlan.departureHour,
-        initialMinute = dayPlan.departureMinute,
-        is24Hour = true,
-    )
+    var departureHour   by remember { mutableIntStateOf(dayPlan.departureHour) }
+    var departureMinute by remember { mutableIntStateOf(dayPlan.departureMinute) }
 
-    // Save departure time when it changes
-    LaunchedEffect(timePickerState.hour, timePickerState.minute) {
-        if (timePickerState.hour != dayPlan.departureHour || timePickerState.minute != dayPlan.departureMinute) {
-            tripViewModel.setDayPlan(
-                tripId,
-                dayPlan.copy(
-                    dayMillis = dayMillis,
-                    departureHour = timePickerState.hour,
-                    departureMinute = timePickerState.minute,
-                )
-            )
-        }
+    // Sync from stored plan when navigating back or after external changes
+    LaunchedEffect(dayPlan.departureHour, dayPlan.departureMinute) {
+        departureHour = dayPlan.departureHour
+        departureMinute = dayPlan.departureMinute
     }
 
     val isFinalDay = dayMillis >= trip.endMillis
@@ -189,17 +183,17 @@ fun DayDetailScreen(
                     text = dayLabel,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DraculaForeground,
+                    color = colors.foreground,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = "Day $dayNumber of $totalDays  •  📍 $locationLabel",
                     fontSize = 14.sp,
-                    color = DraculaComment,
+                    color = colors.comment,
                 )
             }
 
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
 
             // ── Moving / Staying day ──
             Card(
@@ -208,8 +202,8 @@ fun DayDetailScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isMovingDay) DraculaOrange.copy(alpha = 0.15f)
-                    else DraculaGreen.copy(alpha = 0.15f)
+                    containerColor = if (isMovingDay) colors.orange.copy(alpha = 0.15f)
+                    else colors.green.copy(alpha = 0.15f)
                 ),
             ) {
                 Row(
@@ -217,7 +211,7 @@ fun DayDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = if (isMovingDay) "🚗" else "🏨",
+                        text = if (isMovingDay) "🚗" else "�",
                         fontSize = 28.sp,
                     )
                     Spacer(Modifier.width(12.dp))
@@ -226,11 +220,15 @@ fun DayDetailScreen(
                             text = if (isMovingDay) "Moving Day" else "Staying Day",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isMovingDay) DraculaOrange else DraculaGreen,
+                            color = if (isMovingDay) colors.orange else colors.green,
                         )
                         Text(
                             text = if (isMovingDay) {
                                 when {
+                                    isFinalDay -> {
+                                        val ep = trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "home" } }
+                                        "Returning to $ep"
+                                    }
                                     dayMillis == trip.startMillis ->
                                         "Traveling from ${trip.startingPoint.ifBlank { "home" }} to $locationLabel"
                                     prevDayAccom != null ->
@@ -242,7 +240,7 @@ fun DayDetailScreen(
                                 "Staying at ${todayAccom?.name?.ifBlank { locationLabel } ?: locationLabel}"
                             },
                             fontSize = 13.sp,
-                            color = DraculaComment,
+                            color = colors.comment,
                         )
                     }
                 }
@@ -255,25 +253,25 @@ fun DayDetailScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    colors = CardDefaults.cardColors(containerColor = colors.current),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Accommodation", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaPurple)
+                        Text("Accommodation", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = todayAccom.name.ifBlank { "(Not named)" },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = DraculaForeground,
+                            color = colors.foreground,
                         )
                         if (todayAccom.location.isNotBlank()) {
-                            Text("📍 ${todayAccom.location}", fontSize = 13.sp, color = DraculaComment)
+                            Text("📍 ${todayAccom.location}", fontSize = 13.sp, color = colors.comment)
                         }
                         if (todayAccom.pricePerNight != null && todayAccom.pricePerNight > 0) {
                             Text(
                                 "💰 ${todayAccom.pricePerNight} ${todayAccom.priceCurrency} / night",
                                 fontSize = 13.sp,
-                                color = DraculaGreen,
+                                color = colors.green,
                             )
                         }
                     }
@@ -288,10 +286,10 @@ fun DayDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                colors = CardDefaults.cardColors(containerColor = colors.current),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Sunrise & Sunset", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaPurple)
+                    Text("Sunrise & Sunset", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                     Spacer(Modifier.height(12.dp))
 
                     if (sunTimesLoading) {
@@ -299,13 +297,13 @@ fun DayDetailScreen(
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp,
-                                color = DraculaPurple,
+                                color = colors.primary,
                             )
                             Spacer(Modifier.width(12.dp))
-                            Text("Fetching sun times…", fontSize = 14.sp, color = DraculaComment)
+                            Text("Fetching sun times…", fontSize = 14.sp, color = colors.comment)
                         }
                     } else if (sunTimesError != null) {
-                        Text("⚠️ $sunTimesError", fontSize = 14.sp, color = DraculaYellow)
+                        Text("⚠️ $sunTimesError", fontSize = 14.sp, color = colors.yellow)
                     } else if (sunTimes != null) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -315,12 +313,12 @@ fun DayDetailScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("🌅", fontSize = 32.sp)
                                 Spacer(Modifier.height(4.dp))
-                                Text("Sunrise", fontSize = 12.sp, color = DraculaComment)
+                                Text("Sunrise", fontSize = 12.sp, color = colors.comment)
                                 Text(
                                     sunTimes!!.sunriseFormatted,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DraculaOrange,
+                                    color = colors.orange,
                                 )
                             }
 
@@ -328,14 +326,14 @@ fun DayDetailScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("☀️", fontSize = 32.sp)
                                 Spacer(Modifier.height(4.dp))
-                                Text("Daylight", fontSize = 12.sp, color = DraculaComment)
+                                Text("Daylight", fontSize = 12.sp, color = colors.comment)
                                 val hours = sunTimes!!.dayLengthSeconds / 3600
                                 val minutes = (sunTimes!!.dayLengthSeconds % 3600) / 60
                                 Text(
                                     "${hours}h ${minutes}m",
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DraculaYellow,
+                                    color = colors.yellow,
                                 )
                             }
 
@@ -343,12 +341,12 @@ fun DayDetailScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("🌇", fontSize = 32.sp)
                                 Spacer(Modifier.height(4.dp))
-                                Text("Sunset", fontSize = 12.sp, color = DraculaComment)
+                                Text("Sunset", fontSize = 12.sp, color = colors.comment)
                                 Text(
                                     sunTimes!!.sunsetFormatted,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DraculaPink,
+                                    color = colors.pink,
                                 )
                             }
                         }
@@ -357,7 +355,7 @@ fun DayDetailScreen(
                         Text(
                             text = "Times are estimated for the location's timezone",
                             fontSize = 11.sp,
-                            color = DraculaComment,
+                            color = colors.comment,
                         )
                     }
                 }
@@ -375,22 +373,22 @@ fun DayDetailScreen(
                         .padding(horizontal = 24.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = DraculaCyan.copy(alpha = 0.10f)
+                        containerColor = colors.accent.copy(alpha = 0.10f)
                     ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Tomorrow", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaCyan)
+                        Text("Tomorrow", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.accent)
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "🚗 Moving to ${nextDayAccom.location}",
                             fontSize = 14.sp,
-                            color = DraculaForeground,
+                            color = colors.foreground,
                         )
                         if (nextDayAccom.name.isNotBlank()) {
                             Text(
                                 text = "🏨 ${nextDayAccom.name}",
                                 fontSize = 13.sp,
-                                color = DraculaComment,
+                                color = colors.comment,
                             )
                         }
                     }
@@ -400,7 +398,7 @@ fun DayDetailScreen(
             // Check if this is the last day
             val isFinalDay = dayMillis >= trip.endMillis
             val isLastDay = dayMillis + ONE_DAY_MS >= trip.endMillis
-            if (isLastDay && trip.startingPoint.isNotBlank()) {
+            if (isLastDay && (trip.startingPoint.isNotBlank() || trip.endingPoint.isNotBlank())) {
                 Spacer(Modifier.height(8.dp))
                 Card(
                     modifier = Modifier
@@ -408,16 +406,17 @@ fun DayDetailScreen(
                         .padding(horizontal = 24.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = DraculaCyan.copy(alpha = 0.10f)
+                        containerColor = colors.accent.copy(alpha = 0.10f)
                     ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Tomorrow", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaCyan)
+                        Text("Tomorrow", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.accent)
                         Spacer(Modifier.height(4.dp))
+                        val ep = trip.endingPoint.ifBlank { trip.startingPoint }
                         Text(
-                            text = "🏠 Returning home to ${trip.startingPoint}",
+                            text = "\uD83C\uDFE0 Returning home to $ep",
                             fontSize = 14.sp,
-                            color = DraculaForeground,
+                            color = colors.foreground,
                         )
                     }
                 }
@@ -425,7 +424,7 @@ fun DayDetailScreen(
 
             // ── Activities section ──
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = DraculaCurrent)
+            HorizontalDivider(color = colors.current)
             Spacer(Modifier.height(12.dp))
 
             val dayActivities = tripViewModel.getActivitiesForDay(tripId, dayMillis)
@@ -434,47 +433,82 @@ fun DayDetailScreen(
                 text = "Activities",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = DraculaForeground,
+                color = colors.foreground,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
 
             // ── Departure time picker ──
             Spacer(Modifier.height(8.dp))
-            Card(
+            Text(
+                text = "Departure time",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.primary,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Text(
+                text = if (isMovingDay) {
+                    val leaveFrom = when {
+                        dayMillis == trip.startMillis -> trip.startingPoint.ifBlank { "home" }
+                        todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
+                        prevDayAccom != null -> prevDayAccom.name.ifBlank { prevDayAccom.location }
+                        else -> "your accommodation"
+                    }
+                    "When you start your journey from $leaveFrom"
+                } else {
+                    "When you leave ${todayAccom?.name?.ifBlank { "your accommodation" } ?: "your accommodation"} for the day"
+                },
+                fontSize = 12.sp,
+                color = colors.comment,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            var departureSetConfirmed by remember { mutableStateOf(false) }
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                CompactTimePicker(
+                    hour = departureHour,
+                    minute = departureMinute,
+                    onHourChange = { departureHour = it },
+                    onMinuteChange = { departureMinute = it },
+                    modifier = Modifier.width(180.dp),
+                    containerColor = colors.current,
+                    textColor = colors.foreground,
+                    accentColor = colors.primary,
+                )
+                Spacer(Modifier.width(12.dp))
+                FilledTonalButton(
+                    onClick = {
+                        tripViewModel.setDayPlan(
+                            tripId,
+                            dayPlan.copy(
+                                dayMillis = dayMillis,
+                                departureHour = departureHour,
+                                departureMinute = departureMinute,
+                            )
+                        )
+                        departureSetConfirmed = true
+                    },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = colors.green.copy(alpha = 0.2f),
+                        contentColor = colors.green,
+                    ),
                 ) {
-                    Text(
-                        text = "Departure time",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = DraculaPurple,
-                    )
-                    Text(
-                        text = "When you leave ${todayAccom?.name?.ifBlank { "your accommodation" } ?: "your accommodation"} for the day",
-                        fontSize = 12.sp,
-                        color = DraculaComment,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    TimeInput(
-                        state = timePickerState,
-                        colors = TimePickerDefaults.colors(
-                            timeSelectorSelectedContainerColor = DraculaPurple.copy(alpha = 0.25f),
-                            timeSelectorSelectedContentColor = DraculaForeground,
-                            timeSelectorUnselectedContainerColor = DraculaCurrent,
-                            timeSelectorUnselectedContentColor = DraculaForeground,
-                        ),
-                    )
+                    Text(if (departureSetConfirmed) "✓ Set" else "Set")
                 }
             }
+            LaunchedEffect(departureSetConfirmed) {
+                if (departureSetConfirmed) {
+                    kotlinx.coroutines.delay(1500)
+                    departureSetConfirmed = false
+                }
+            }
+            Spacer(Modifier.height(8.dp))
 
             Spacer(Modifier.height(8.dp))
 
@@ -482,23 +516,100 @@ fun DayDetailScreen(
                 Text(
                     text = "No activities planned for this day",
                     fontSize = 13.sp,
-                    color = DraculaComment,
+                    color = colors.comment,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             } else {
-                // ── Sequential activity timeline ──
-                var cumulativeMinutes = timePickerState.hour * 60 + timePickerState.minute
+                var cumulativeMinutes = departureHour * 60 + departureMinute
 
-                dayActivities.forEachIndexed { index, activity ->
-                    val driveTo = activity.drivingTimeToMinutes ?: 0
-                    val fromLabel = if (index == 0) {
-                        todayAccom?.name?.ifBlank { todayAccom.location } ?: "Accommodation"
-                    } else {
-                        dayActivities[index - 1].name
+                if (isMovingDay) {
+                    // ── Travel Day Timeline ──
+                    val beforeActivities = dayActivities.filter {
+                        it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                    }.sortedBy { it.orderIndex }
+                    val afterActivities = dayActivities.filter {
+                        it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
+                    }.sortedBy { it.orderIndex }
+
+                    val originLabel = when {
+                        dayMillis == trip.startMillis -> trip.startingPoint.ifBlank { "Home" }
+                        prevDayAccom != null -> prevDayAccom.name.ifBlank { prevDayAccom.location }
+                        todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
+                        else -> trip.startingPoint.ifBlank { "Home" }
+                    }
+                    val destLabel = when {
+                        isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "Home" } }
+                        todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
+                        else -> "Accommodation"
+                    }
+                    val arrivalEmoji = "🏠"
+
+                    // --- BEFORE_ARRIVAL group: detours on the way ---
+                    if (beforeActivities.isNotEmpty()) {
+                        Text(
+                            text = "\uD83D\uDEE3\uFE0F On the way to $destLabel",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.orange,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+
+                        beforeActivities.forEachIndexed { index, activity ->
+                            val driveTo = activity.drivingTimeToMinutes ?: 0
+                            val fromLabel = if (index == 0) originLabel else beforeActivities[index - 1].name
+                            cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
+                            cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
+                        }
+
+                        // Drive from last detour to destination
+                        val arrivalDrive = beforeActivities.last().returnDrivingTimeMinutes ?: 0
+                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", arrivalDrive, colors)
                     }
 
-                    // Show drive segment
-                    if (driveTo > 0) {
+                    // --- Arrival at destination ---
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.comment,
+                            modifier = Modifier.width(48.dp),
+                        )
+                        Text(
+                            text = "$arrivalEmoji Arrived at $destLabel",
+                            fontSize = 12.sp,
+                            color = colors.green,
+                        )
+                    }
+
+                    // --- AFTER_ARRIVAL group: at destination ---
+                    if (afterActivities.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "\uD83D\uDCCC At $destLabel",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.green,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+
+                        afterActivities.forEachIndexed { index, activity ->
+                            val driveTo = activity.drivingTimeToMinutes ?: 0
+                            val fromLabel = if (index == 0) destLabel else afterActivities[index - 1].name
+                            cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
+                            cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
+                        }
+
+                        // Return drive
+                        val returnDrive = afterActivities.last().returnDrivingTimeMinutes ?: 0
+                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", returnDrive, colors)
+
+                        // Back at destination
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -509,143 +620,63 @@ fun DayDetailScreen(
                                 text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = DraculaComment,
+                                color = colors.comment,
                                 modifier = Modifier.width(48.dp),
                             )
                             Text(
-                                text = "\uD83D\uDE97 Drive from $fromLabel (${formatMinutes(driveTo)})",
+                                text = "$arrivalEmoji Back at $destLabel",
                                 fontSize = 12.sp,
-                                color = DraculaOrange,
+                                color = colors.pink,
                             )
                         }
                     }
-
-                    cumulativeMinutes += driveTo
-                    val arriveTime = cumulativeMinutes
-
-                    // Activity card (clickable for editing)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 4.dp)
-                            .clickable { onEditActivity(activity.id) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            // Time column
-                            Column(
-                                modifier = Modifier.width(52.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = "%02d:%02d".format((arriveTime / 60) % 24, arriveTime % 60),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = DraculaCyan,
-                                )
-                                Text(
-                                    text = formatMinutes(activity.durationMinutes),
-                                    fontSize = 11.sp,
-                                    color = DraculaComment,
-                                )
-                            }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            Column(Modifier.weight(1f)) {
-                                val catEmoji = try {
-                                    com.example.traveltool.data.ActivityCategory.valueOf(activity.category).emoji
-                                } catch (_: Exception) { "\uD83D\uDCCC" }
-
-                                Text(
-                                    text = "$catEmoji ${activity.name}",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = DraculaForeground,
-                                )
-                                Text(
-                                    text = "\uD83D\uDCCD ${activity.location}",
-                                    fontSize = 12.sp,
-                                    color = DraculaComment,
-                                )
-                                if (activity.description.isNotBlank()) {
-                                    Text(
-                                        text = activity.description,
-                                        fontSize = 11.sp,
-                                        color = DraculaComment,
-                                        maxLines = 2,
-                                    )
-                                }
-                                if (activity.rating != null) {
-                                    Text(
-                                        text = "\u2B50 ${String.format("%.1f", activity.rating)}",
-                                        fontSize = 12.sp,
-                                        color = DraculaYellow,
-                                    )
-                                }
-                                if (activity.eatingType.isNotBlank()) {
-                                    Text(
-                                        text = "\uD83C\uDF7D\uFE0F ${activity.eatingType}",
-                                        fontSize = 12.sp,
-                                        color = DraculaPurple,
-                                    )
-                                }
-                            }
-                            IconButton(
-                                onClick = { tripViewModel.deleteActivity(tripId, activity.id) },
-                                modifier = Modifier.size(32.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete activity",
-                                    tint = DraculaRed,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
+                } else {
+                    // ── Staying Day Timeline ──
+                    dayActivities.forEachIndexed { index, activity ->
+                        val driveTo = activity.drivingTimeToMinutes ?: 0
+                        val fromLabel = if (index == 0) {
+                            todayAccom?.name?.ifBlank { todayAccom.location } ?: "Accommodation"
+                        } else {
+                            dayActivities[index - 1].name
                         }
+                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
+                        cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
                     }
 
-                    cumulativeMinutes += activity.durationMinutes
-                }
+                    // Return segment
+                    val lastActivity = dayActivities.last()
+                    val returnDriveMin = lastActivity.returnDrivingTimeMinutes ?: 0
+                    val returnToLabel = todayAccom?.let {
+                        it.name.ifBlank { it.location.ifBlank { "Accommodation" } }
+                    } ?: "Accommodation"
 
-                // Show return segment
-                val returnToLabel = when {
-                    isFinalDay -> trip.startingPoint.ifBlank { "Home" }
-                    isMovingDay && nextDayAccom != null -> nextDayAccom.location.ifBlank { "Next accommodation" }
-                    todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
-                    else -> "Accommodation"
-                }
+                    cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $returnToLabel", returnDriveMin, colors)
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DraculaComment,
-                        modifier = Modifier.width(48.dp),
-                    )
-                    Text(
-                        text = if (isFinalDay) "\uD83C\uDFE0 Head home to $returnToLabel"
-                        else "\uD83C\uDFE8 Return to $returnToLabel",
-                        fontSize = 12.sp,
-                        color = DraculaPink,
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.comment,
+                            modifier = Modifier.width(48.dp),
+                        )
+                        Text(
+                            text = "\uD83C\uDFE0 Back at $returnToLabel",
+                            fontSize = 12.sp,
+                            color = colors.pink,
+                        )
+                    }
                 }
 
                 // ── Day summary card ──
                 Spacer(Modifier.height(8.dp))
-                val totalDrivingMin = dayActivities.sumOf { it.drivingTimeToMinutes ?: 0 }
+                val totalDrivingMin = dayActivities.sumOf { it.drivingTimeToMinutes ?: 0 } +
+                    dayActivities.sumOf { it.returnDrivingTimeMinutes ?: 0 }
                 val totalActivityMin = dayActivities.sumOf { it.durationMinutes }
 
                 val endMinutes = cumulativeMinutes
@@ -658,34 +689,34 @@ fun DayDetailScreen(
                         .padding(horizontal = 24.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = DraculaPurple.copy(alpha = 0.12f)
+                        containerColor = colors.primary.copy(alpha = 0.12f)
                     ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Day Summary", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DraculaPurple)
+                        Text("Day Summary", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.primary)
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Column {
-                                Text("\uD83D\uDE97 Total travel", fontSize = 12.sp, color = DraculaComment)
-                                Text(formatMinutes(totalDrivingMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DraculaOrange)
+                                Text("\uD83D\uDE97 Total travel", fontSize = 12.sp, color = colors.comment)
+                                Text(formatMinutes(totalDrivingMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.orange)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("\u23F1 Total activity", fontSize = 12.sp, color = DraculaComment)
-                                Text(formatMinutes(totalActivityMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DraculaGreen)
+                                Text("\u23F1 Total activity", fontSize = 12.sp, color = colors.comment)
+                                Text(formatMinutes(totalActivityMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.green)
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     "Done at",
-                                    fontSize = 12.sp, color = DraculaComment,
+                                    fontSize = 12.sp, color = colors.comment,
                                 )
                                 Text(
                                     "%02d:%02d".format(finalH, finalM),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DraculaPink,
+                                    color = colors.pink,
                                 )
                             }
                         }
@@ -703,7 +734,7 @@ fun DayDetailScreen(
                     .padding(horizontal = 24.dp)
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DraculaGreen,
+                    containerColor = colors.green,
                     contentColor = MaterialTheme.colorScheme.background,
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -736,4 +767,138 @@ private fun formatMinutes(minutes: Int): String {
     val h = minutes / 60
     val m = minutes % 60
     return if (h > 0) "${h}h ${m}m" else "${m}m"
+}
+
+/**
+ * Render a drive segment row and return the updated cumulative minutes.
+ */
+@Composable
+private fun renderDriveSegment(
+    cumulativeMinutes: Int,
+    driveLabel: String,
+    durationMinutes: Int,
+    colors: AppColors,
+): Int {
+    if (durationMinutes > 0) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.comment,
+                modifier = Modifier.width(48.dp),
+            )
+            Text(
+                text = "\uD83D\uDE97 $driveLabel (${formatMinutes(durationMinutes)})",
+                fontSize = 12.sp,
+                color = colors.orange,
+            )
+        }
+    }
+    return cumulativeMinutes + durationMinutes
+}
+
+/**
+ * Render an activity card in the timeline and return updated cumulative minutes.
+ */
+@Composable
+private fun renderActivityCard(
+    activity: Activity,
+    arriveTime: Int,
+    colors: AppColors,
+    onEditActivity: (String) -> Unit,
+    tripId: String,
+    tripViewModel: TripViewModel,
+): Int {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 4.dp)
+            .clickable { onEditActivity(activity.id) },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.current),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(
+                modifier = Modifier.width(52.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "%02d:%02d".format((arriveTime / 60) % 24, arriveTime % 60),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.accent,
+                )
+                Text(
+                    text = formatMinutes(activity.durationMinutes),
+                    fontSize = 11.sp,
+                    color = colors.comment,
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            Column(Modifier.weight(1f)) {
+                val catEmoji = try {
+                    com.example.traveltool.data.ActivityCategory.valueOf(activity.category).emoji
+                } catch (_: Exception) { "\uD83D\uDCCC" }
+
+                Text(
+                    text = "$catEmoji ${activity.name}",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.foreground,
+                )
+                Text(
+                    text = "\uD83D\uDCCD ${activity.location}",
+                    fontSize = 12.sp,
+                    color = colors.comment,
+                )
+                if (activity.description.isNotBlank()) {
+                    Text(
+                        text = activity.description,
+                        fontSize = 11.sp,
+                        color = colors.comment,
+                        maxLines = 2,
+                    )
+                }
+                if (activity.rating != null) {
+                    Text(
+                        text = "\u2B50 ${String.format("%.1f", activity.rating)}",
+                        fontSize = 12.sp,
+                        color = colors.yellow,
+                    )
+                }
+                if (activity.eatingType.isNotBlank()) {
+                    Text(
+                        text = "\uD83C\uDF7D\uFE0F ${activity.eatingType}",
+                        fontSize = 12.sp,
+                        color = colors.primary,
+                    )
+                }
+            }
+            IconButton(
+                onClick = { tripViewModel.deleteActivity(tripId, activity.id) },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete activity",
+                    tint = colors.red,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+    return arriveTime + activity.durationMinutes
 }

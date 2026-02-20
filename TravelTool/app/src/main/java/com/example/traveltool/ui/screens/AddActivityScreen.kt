@@ -56,6 +56,7 @@ fun AddActivityScreen(
     prefillCategory: String? = null,
     prefillEatingType: String? = null,
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
     if (trip == null) { onBack(); return }
 
@@ -85,12 +86,61 @@ fun AddActivityScreen(
             ?: trip.accommodations.find { it.startMillis <= dayMillis && dayMillis <= it.endMillis }
     }
 
+    // Previous day accommodation (for moving day detection)
+    val prevDayAccom = remember(trip.accommodations, dayMillis) {
+        if (dayMillis > trip.startMillis) {
+            val prevDay = dayMillis - ONE_DAY_MS
+            trip.accommodations.find { it.startMillis <= prevDay && prevDay < it.endMillis }
+                ?: trip.accommodations.find { it.startMillis <= prevDay && prevDay <= it.endMillis }
+        } else null
+    }
+
+    val isFinalDay = dayMillis >= trip.endMillis
+    val isMovingDay = remember(todayAccom, prevDayAccom, dayMillis, trip.startMillis, trip.endMillis) {
+        when {
+            dayMillis == trip.startMillis -> true
+            isFinalDay -> true
+            todayAccom == null -> false
+            prevDayAccom == null -> true
+            prevDayAccom.location != todayAccom.location -> true
+            else -> false
+        }
+    }
+
+    // Travel day position: before or after arrival
+    var selectedPosition by remember { mutableStateOf(TravelDayPosition.AFTER_ARRIVAL.name) }
+
+    // Origin location for this travel day
+    val originLocation = when {
+        dayMillis == trip.startMillis -> trip.startingPoint
+        prevDayAccom != null -> prevDayAccom.location
+        todayAccom != null -> todayAccom.location
+        else -> trip.startingPoint
+    }
+
+    // Destination for this travel day
+    val destLocation = when {
+        isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint }
+        todayAccom != null -> todayAccom.location
+        else -> trip.startingPoint
+    }
+
     // Get existing activities for this day to determine "from" location
     val existingActivities = tripViewModel.getActivitiesForDay(tripId, dayMillis)
-    val fromLocation = if (existingActivities.isNotEmpty()) {
-        existingActivities.last().location
+    val fromLocation = if (isMovingDay) {
+        if (selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name) {
+            val sameGroup = existingActivities.filter { it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name }
+            sameGroup.maxByOrNull { it.orderIndex }?.location ?: originLocation
+        } else {
+            val sameGroup = existingActivities.filter { it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name }
+            sameGroup.maxByOrNull { it.orderIndex }?.location ?: destLocation
+        }
     } else {
-        todayAccom?.location?.ifBlank { trip.startingPoint } ?: trip.startingPoint
+        if (existingActivities.isNotEmpty()) {
+            existingActivities.last().location
+        } else {
+            todayAccom?.location?.ifBlank { trip.startingPoint } ?: trip.startingPoint
+        }
     }
 
     fun searchLocation() {
@@ -169,16 +219,71 @@ fun AddActivityScreen(
                             isSaving = true
                             val apiKey = ApiKeyStore.getOpenAiKey(context)
                             val model = ApiKeyStore.getOpenAiModel(context)
+                            val googleKey = try {
+                                val appInfo = context.packageManager.getApplicationInfo(
+                                    context.packageName,
+                                    android.content.pm.PackageManager.GET_META_DATA
+                                )
+                                appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+                            } catch (_: Exception) { "" }
                             scope.launch {
                                 // Estimate driving time from previous location to this activity
                                 var drivingTo: Int? = null
+                                var drivingDistTo: Double? = null
+                                var returnTime: Int? = null
+                                var returnDist: Double? = null
 
-                                if (apiKey.isNotBlank() && fromLocation.isNotBlank()) {
-                                    drivingTo = DirectionsApiHelper.estimateDrivingTime(
+                                if (fromLocation.isNotBlank()) {
+                                    val est = DirectionsApiHelper.estimateDrivingTime(
                                         from = fromLocation,
                                         to = location.trim(),
+                                        googleApiKey = googleKey,
                                         openAiApiKey = apiKey,
                                         model = model,
+                                    )
+                                    drivingTo = est?.timeMinutes
+                                    drivingDistTo = est?.distanceKm
+                                }
+
+                                // Estimate return drive from this activity back to destination/accommodation
+                                val returnTo = if (isFinalDay) {
+                                    trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { null } }
+                                } else {
+                                    todayAccom?.location?.ifBlank { null }
+                                        ?: trip.startingPoint.ifBlank { null }
+                                }
+                                if (apiKey.isNotBlank() && returnTo != null) {
+                                    val retEst = DirectionsApiHelper.estimateDrivingTime(
+                                        from = location.trim(),
+                                        to = returnTo,
+                                        googleApiKey = googleKey,
+                                        openAiApiKey = apiKey,
+                                        model = model,
+                                    )
+                                    returnTime = retEst?.timeMinutes
+                                    returnDist = retEst?.distanceKm
+                                }
+
+                                // Clear return drive on previous last activity in the same group
+                                if (isMovingDay) {
+                                    val sameGroup = existingActivities.filter {
+                                        if (selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name)
+                                            it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                                        else
+                                            it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
+                                    }
+                                    val prev = sameGroup.maxByOrNull { it.orderIndex }
+                                    if (prev != null) {
+                                        tripViewModel.updateActivity(
+                                            tripId,
+                                            prev.copy(returnDrivingTimeMinutes = null, returnDrivingDistanceKm = null)
+                                        )
+                                    }
+                                } else if (existingActivities.isNotEmpty()) {
+                                    val prev = existingActivities.last()
+                                    tripViewModel.updateActivity(
+                                        tripId,
+                                        prev.copy(returnDrivingTimeMinutes = null, returnDrivingDistanceKm = null)
                                     )
                                 }
 
@@ -188,10 +293,14 @@ fun AddActivityScreen(
                                     location = location.trim(),
                                     durationMinutes = durationMinutes,
                                     drivingTimeToMinutes = drivingTo,
+                                    drivingDistanceToKm = drivingDistTo,
+                                    returnDrivingTimeMinutes = returnTime,
+                                    returnDrivingDistanceKm = returnDist,
                                     description = description.trim(),
                                     rating = rating,
                                     category = selectedCategory,
                                     eatingType = selectedEatingType,
+                                    travelDayPosition = if (isMovingDay) selectedPosition else "",
                                 )
                                 tripViewModel.addActivity(tripId, activity)
                                 isSaving = false
@@ -203,7 +312,7 @@ fun AddActivityScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -236,9 +345,41 @@ fun AddActivityScreen(
                 text = "Activity for $dayLabel",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = DraculaPurple,
+                color = colors.primary,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
             )
+
+            // ── Travel day position picker (only on moving days) ──
+            if (isMovingDay) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = selectedPosition == TravelDayPosition.BEFORE_ARRIVAL.name,
+                        onClick = { selectedPosition = TravelDayPosition.BEFORE_ARRIVAL.name },
+                        label = { Text("\uD83D\uDEE3\uFE0F On the way") },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.orange.copy(alpha = 0.2f),
+                            selectedLabelColor = colors.orange,
+                        ),
+                    )
+                    FilterChip(
+                        selected = selectedPosition == TravelDayPosition.AFTER_ARRIVAL.name,
+                        onClick = { selectedPosition = TravelDayPosition.AFTER_ARRIVAL.name },
+                        label = { Text("\uD83C\uDFE8 After arrival") },
+                        modifier = Modifier.weight(1f),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.green.copy(alpha = 0.2f),
+                            selectedLabelColor = colors.green,
+                        ),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
 
             // ── Recommend something button ──
             OutlinedButton(
@@ -249,74 +390,10 @@ fun AddActivityScreen(
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = DraculaCyan,
+                    contentColor = colors.accent,
                 ),
             ) {
                 Text("\uD83D\uDCA1 Recommend something", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Category selection ──
-            Text(
-                text = "Category",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = DraculaForeground,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-
-            // Category chips
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ActivityCategory.entries.forEach { cat ->
-                    FilterChip(
-                        selected = selectedCategory == cat.name,
-                        onClick = {
-                            selectedCategory = if (selectedCategory == cat.name) "" else cat.name
-                            if (selectedCategory != ActivityCategory.EATING.name) selectedEatingType = ""
-                        },
-                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 13.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = DraculaPurple.copy(alpha = 0.3f),
-                            selectedLabelColor = DraculaForeground,
-                        ),
-                    )
-                }
-            }
-
-            // Eating sub-selection
-            if (selectedCategory == ActivityCategory.EATING.name) {
-                Spacer(Modifier.height(8.dp))
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    EatingType.entries.forEach { et ->
-                        FilterChip(
-                            selected = selectedEatingType == et.name,
-                            onClick = {
-                                selectedEatingType = if (selectedEatingType == et.name) "" else et.name
-                            },
-                            label = { Text(et.label, fontSize = 13.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DraculaCyan.copy(alpha = 0.3f),
-                                selectedLabelColor = DraculaForeground,
-                            ),
-                        )
-                    }
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -332,9 +409,9 @@ fun AddActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -356,9 +433,9 @@ fun AddActivityScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 FilledIconButton(
@@ -366,8 +443,8 @@ fun AddActivityScreen(
                     enabled = location.isNotBlank(),
                     modifier = Modifier.height(56.dp).width(56.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = DraculaPurple,
-                        contentColor = DraculaForeground,
+                        containerColor = colors.primary,
+                        contentColor = colors.foreground,
                     )
                 ) {
                     Icon(Icons.Default.Search, contentDescription = "Search location")
@@ -411,9 +488,9 @@ fun AddActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -431,9 +508,9 @@ fun AddActivityScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -446,28 +523,28 @@ fun AddActivityScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+                    colors = CardDefaults.cardColors(containerColor = colors.current),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Route info", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaPurple)
+                        Text("Route info", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = "\uD83D\uDCCD From: $fromLocation",
                             fontSize = 13.sp,
-                            color = DraculaComment,
+                            color = colors.comment,
                         )
                         if (location.isNotBlank()) {
                             Text(
                                 text = "\uD83D\uDCCD To: ${location.trim()}",
                                 fontSize = 13.sp,
-                                color = DraculaGreen,
+                                color = colors.green,
                             )
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "Driving time will be estimated by AI after saving.",
                             fontSize = 11.sp,
-                            color = DraculaComment,
+                            color = colors.comment,
                         )
                     }
                 }

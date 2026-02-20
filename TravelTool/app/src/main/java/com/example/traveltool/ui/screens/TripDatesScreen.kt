@@ -9,8 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.traveltool.ui.theme.DraculaGreen
-import com.example.traveltool.ui.theme.DraculaPurple
+import com.example.traveltool.ui.theme.*
 
 /**
  * Step 2 — pick start and end dates with the Material 3 DateRangePicker.
@@ -25,6 +24,7 @@ fun TripDatesScreen(
     onNext: (startMillis: Long, endMillis: Long) -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val dateRangePickerState = rememberDateRangePickerState(
         initialDisplayMode = DisplayMode.Picker
     )
@@ -66,7 +66,7 @@ fun TripDatesScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -85,7 +85,7 @@ fun TripDatesScreen(
                 text = "When is \"$tripName\"?",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DraculaPurple,
+                color = colors.primary,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
             )
 
@@ -107,10 +107,10 @@ fun TripDatesScreen(
                 },
                 colors = DatePickerDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    selectedDayContainerColor = DraculaPurple,
-                    todayDateBorderColor = DraculaPurple,
-                    dayInSelectionRangeContainerColor = DraculaPurple.copy(alpha = .25f),
-                    todayContentColor = DraculaPurple,
+                    selectedDayContainerColor = colors.primary,
+                    todayDateBorderColor = colors.primary,
+                    dayInSelectionRangeContainerColor = colors.primary.copy(alpha = .25f),
+                    todayContentColor = colors.primary,
                 ),
             )
         }

@@ -52,6 +52,7 @@ fun AddAccommodationScreen(
     tripViewModel: TripViewModel,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -96,31 +97,42 @@ fun AddAccommodationScreen(
         }
     }
 
-    // Compute which days are occupied by any existing accommodation (all blocked)
+    // Compute which days are strictly interior (occupied, not boundary).
+    // Boundary days (end of one accom) can be the start of the next.
     val existingAccommodations = trip.accommodations
-    val occupiedDays = remember(existingAccommodations) {
+    val tripStartDay = remember(trip.startMillis) { normalizeToDay(trip.startMillis) }
+    val tripEndDay = remember(trip.endMillis) { normalizeToDay(trip.endMillis) }
+
+    val interiorDays = remember(existingAccommodations) {
         val set = mutableSetOf<Long>()
         for (accom in existingAccommodations) {
-            var d = accom.startMillis
-            while (d <= accom.endMillis) {
-                set.add(normalizeToDay(d))
+            val start = normalizeToDay(accom.startMillis)
+            val end   = normalizeToDay(accom.endMillis)
+            // Only block days strictly between start and end (exclusive of both endpoints)
+            var d = start + oneDayMs
+            while (d < end) {
+                set.add(d)
                 d += oneDayMs
             }
         }
         set
     }
 
-    // Trip range normalized for visual highlighting
-    val tripStartDay = remember(trip.startMillis) { normalizeToDay(trip.startMillis) }
-    val tripEndDay = remember(trip.endMillis) { normalizeToDay(trip.endMillis) }
+    // Start days of existing accommodations — blocked as start for new ones
+    // (you can't start a new one on the same day another already starts)
+    val occupiedStartDays = remember(existingAccommodations) {
+        existingAccommodations.map { normalizeToDay(it.startMillis) }.toSet()
+    }
 
     val selectableDates = object : SelectableDates {
         override fun isSelectableDate(utcTimeMillis: Long): Boolean {
             val normalized = normalizeToDay(utcTimeMillis)
             // Must be within trip range
             if (normalized < tripStartDay || normalized > tripEndDay) return false
-            // All occupied days are blocked
-            if (normalized in occupiedDays) return false
+            // Strictly interior days of any accommodation are always blocked
+            if (normalized in interiorDays) return false
+            // Start days of existing accommodations are blocked
+            if (normalized in occupiedStartDays) return false
             return true
         }
     }
@@ -184,7 +196,7 @@ fun AddAccommodationScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = DraculaGreen,
+                            containerColor = colors.green,
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
@@ -212,9 +224,9 @@ fun AddAccommodationScreen(
                     .padding(horizontal = 24.dp)
                     .padding(top = 16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DraculaPurple,
-                    focusedLabelColor = DraculaPurple,
-                    cursorColor = DraculaPurple,
+                    focusedBorderColor = colors.primary,
+                    focusedLabelColor = colors.primary,
+                    cursorColor = colors.primary,
                 )
             )
 
@@ -237,9 +249,9 @@ fun AddAccommodationScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 CurrencyPicker(
@@ -267,9 +279,9 @@ fun AddAccommodationScreen(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                        focusedBorderColor = colors.primary,
+                        focusedLabelColor = colors.primary,
+                        cursorColor = colors.primary,
                     )
                 )
                 FilledIconButton(
@@ -277,8 +289,8 @@ fun AddAccommodationScreen(
                     enabled = accomLocation.isNotBlank(),
                     modifier = Modifier.height(56.dp).width(56.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = DraculaPurple,
-                        contentColor = DraculaForeground,
+                        containerColor = colors.primary,
+                        contentColor = colors.foreground,
                     )
                 ) {
                     Icon(Icons.Default.Search, contentDescription = "Search location")
@@ -314,7 +326,7 @@ fun AddAccommodationScreen(
             Text(
                 text = "Select dates (greyed-out dates are occupied or outside trip)",
                 fontSize = 14.sp,
-                color = DraculaComment,
+                color = colors.comment,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
 
@@ -336,11 +348,11 @@ fun AddAccommodationScreen(
                 },
                 colors = DatePickerDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    selectedDayContainerColor = DraculaPurple,
-                    todayDateBorderColor = DraculaGreen,
-                    dayInSelectionRangeContainerColor = DraculaPurple.copy(alpha = .25f),
-                    todayContentColor = DraculaGreen,
-                    dayContentColor = DraculaGreen,
+                    selectedDayContainerColor = colors.primary,
+                    todayDateBorderColor = colors.green,
+                    dayInSelectionRangeContainerColor = colors.primary.copy(alpha = .25f),
+                    todayContentColor = colors.green,
+                    dayContentColor = colors.green,
                 ),
             )
 

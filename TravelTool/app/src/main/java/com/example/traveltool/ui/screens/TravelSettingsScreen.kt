@@ -37,6 +37,7 @@ fun TravelSettingsScreen(
     onApiKeySettings: () -> Unit,
     onBack: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val trip = tripViewModel.getTripById(tripId)
 
     if (trip == null) {
@@ -63,6 +64,14 @@ fun TravelSettingsScreen(
     var showAddTicketDialog by remember { mutableStateOf(false) }
     var editingTicket by remember { mutableStateOf<PlaneTicket?>(null) }
     var ticketToDelete by remember { mutableStateOf<PlaneTicket?>(null) }
+
+    var showAddCarRentalDialog by remember { mutableStateOf(false) }
+    var editingCarRental by remember { mutableStateOf<CarRental?>(null) }
+    var carRentalToDelete by remember { mutableStateOf<CarRental?>(null) }
+
+    var showAddPublicTransportDialog by remember { mutableStateOf(false) }
+    var editingPublicTransport by remember { mutableStateOf<PublicTransportFee?>(null) }
+    var publicTransportToDelete by remember { mutableStateOf<PublicTransportFee?>(null) }
 
     var showAddFeeDialog by remember { mutableStateOf(false) }
     var editingFee by remember { mutableStateOf<AdditionalFee?>(null) }
@@ -104,7 +113,7 @@ fun TravelSettingsScreen(
                             selected = trip.travelMode == mode,
                             onClick = { tripViewModel.updateTrip(trip.copy(travelMode = mode)) },
                             label = { Text(when (mode) { TravelMode.CAR -> "🚗 Car"; TravelMode.MICROBUS -> "🚐 Microbus"; TravelMode.PLANE -> "✈️ Plane" }) },
-                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = DraculaPurple, selectedLabelColor = DraculaForeground),
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = colors.primary, selectedLabelColor = colors.foreground),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -123,7 +132,7 @@ fun TravelSettingsScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        colors = draculaTextFieldColors(),
+                        colors = themedTextFieldColors(),
                     )
                     Spacer(Modifier.height(12.dp))
                 }
@@ -142,7 +151,7 @@ fun TravelSettingsScreen(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
-                            colors = draculaTextFieldColors(),
+                            colors = themedTextFieldColors(),
                         )
                         CurrencyPicker(
                             selected = trip.fuelPriceCurrency,
@@ -172,6 +181,7 @@ fun TravelSettingsScreen(
                             scope.launch {
                                 val distanceKm = DirectionsApiHelper.estimateDrivingDistance(
                                     startingPoint = trip.startingPoint,
+                                    endingPoint = trip.endingPoint,
                                     accommodations = trip.accommodations,
                                     openAiApiKey = apiKey,
                                     travelMode = trip.travelMode,
@@ -188,10 +198,10 @@ fun TravelSettingsScreen(
                         },
                         enabled = canEstimate && !isEstimatingFuel,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DraculaCyan, contentColor = DraculaBackground),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.background),
                     ) {
                         if (isEstimatingFuel) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DraculaBackground)
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.background)
                         } else {
                             Icon(Icons.Default.Search, null, Modifier.size(18.dp))
                         }
@@ -201,30 +211,36 @@ fun TravelSettingsScreen(
 
                     // Show result if we have an estimated distance
                     if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
-                        val distKm = trip.estimatedDrivingDistanceKm
-                        val litres = (distKm / 100.0) * trip.fuelConsumption
+                        val routeKm = trip.estimatedDrivingDistanceKm
+                        val activityKm = trip.activities.sumOf { (it.drivingDistanceToKm ?: 0.0) + (it.returnDrivingDistanceKm ?: 0.0) }
+                        val totalKm = routeKm + activityKm
+                        val litres = (totalKm / 100.0) * trip.fuelConsumption
                         val cost = litres * trip.fuelPricePerLiter
 
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                             shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = DraculaGreen.copy(alpha = 0.12f)),
+                            colors = CardDefaults.cardColors(containerColor = colors.green.copy(alpha = 0.12f)),
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Estimated Fuel Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaGreen)
+                                Text("Estimated Fuel Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.green)
                                 Spacer(Modifier.height(6.dp))
-                                Text("🛣️ Distance: ${distKm.toInt()} km", fontSize = 14.sp, color = DraculaForeground)
-                                Text("⛽ Fuel needed: %.1f L".format(litres), fontSize = 14.sp, color = DraculaForeground)
+                                Text("\uD83D\uDEE3\uFE0F Route distance: ${routeKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
+                                if (activityKm > 0) {
+                                    Text("\uD83D\uDCCD Activity drives: ${activityKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
+                                }
+                                Text("\uD83D\uDEE3\uFE0F Total distance: ${totalKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
+                                Text("\u26FD Fuel needed: %.1f L".format(litres), fontSize = 14.sp, color = colors.foreground)
                                 Text(
-                                    "💰 Cost: %.2f %s".format(cost, trip.fuelPriceCurrency),
-                                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DraculaGreen,
+                                    "\uD83D\uDCB0 Cost: %.2f %s".format(cost, trip.fuelPriceCurrency),
+                                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.green,
                                 )
                             }
                         }
                     } else if (!canEstimate) {
                         Text(
                             "Enter fuel consumption and price to estimate fuel cost",
-                            fontSize = 12.sp, color = DraculaComment,
+                            fontSize = 12.sp, color = colors.comment,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
                         )
                     }
@@ -232,10 +248,10 @@ fun TravelSettingsScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
-                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Toll Roads, Vignettes & Ferries") }
+                item { HorizontalDivider(color = colors.current); SectionHeader("Toll Roads, Vignettes & Ferries") }
 
                 if (trip.tollRoads.isEmpty()) {
-                    item { Text("No toll roads added.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                    item { Text("No toll roads added.", fontSize = 14.sp, color = colors.comment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
                 }
                 items(trip.tollRoads, key = { it.id }) { toll ->
                     PriceItemCard(toll.name, toll.price, toll.currency, if (toll.isAutoGenerated) "AI" else null, { editingToll = toll }, { tollToDelete = toll })
@@ -260,6 +276,7 @@ fun TravelSettingsScreen(
                                 scope.launch {
                                     val autoTolls = DirectionsApiHelper.findTollsForTrip(
                                         startingPoint = trip.startingPoint,
+                                        endingPoint = trip.endingPoint,
                                         accommodations = trip.accommodations,
                                         openAiApiKey = apiKey,
                                         travelMode = trip.travelMode,
@@ -274,9 +291,9 @@ fun TravelSettingsScreen(
                                 }
                             },
                             enabled = !isSearchingTolls, modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = DraculaCyan, contentColor = DraculaBackground),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.background),
                         ) {
-                            if (isSearchingTolls) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DraculaBackground)
+                            if (isSearchingTolls) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.background)
                             else Icon(Icons.Default.Search, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp)); Text(if (isSearchingTolls) "AI…" else "Find tolls")
                         }
@@ -287,12 +304,22 @@ fun TravelSettingsScreen(
 
             // ══════════════ PLANE MODE ══════════════
             if (trip.travelMode == TravelMode.PLANE) {
-                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Plane Tickets") }
+                item { HorizontalDivider(color = colors.current); SectionHeader("Plane Tickets") }
                 if (trip.planeTickets.isEmpty()) {
-                    item { Text("No plane tickets added.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                    item { Text("No plane tickets added.", fontSize = 14.sp, color = colors.comment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
                 }
                 items(trip.planeTickets, key = { it.id }) { ticket ->
-                    PriceItemCard(ticket.name, ticket.price, ticket.currency, null, { editingTicket = ticket }, { ticketToDelete = ticket })
+                    val label = buildString {
+                        val from = ticket.fromAirport.ifBlank { null }
+                        val to = ticket.toAirport.ifBlank { null }
+                        if (from != null || to != null) {
+                            append(from ?: "?"); append(" → "); append(to ?: "?")
+                        } else {
+                            append(ticket.name.ifBlank { "(No route)" })
+                        }
+                        if (ticket.quantity > 1) append("  ×${ticket.quantity}")
+                    }
+                    PriceItemCard(label, ticket.price * ticket.quantity, ticket.currency, if (ticket.quantity > 1) "${ticket.quantity} pcs" else null, { editingTicket = ticket }, { ticketToDelete = ticket })
                 }
                 item {
                     Spacer(Modifier.height(8.dp))
@@ -301,12 +328,46 @@ fun TravelSettingsScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                 }
+
+                // ── Car Rental ──────────────────────────────
+                item { HorizontalDivider(color = colors.current); SectionHeader("Car Rental") }
+                if (trip.carRentals.isEmpty()) {
+                    item { Text("No car rentals added.", fontSize = 14.sp, color = colors.comment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                }
+                items(trip.carRentals, key = { it.id }) { rental ->
+                    PriceItemCard(rental.name, rental.price, rental.currency, null, { editingCarRental = rental }, { carRentalToDelete = rental })
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { showAddCarRentalDialog = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Car Rental")
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                // ── Public Transport (shown when no car rental) ─
+                if (trip.carRentals.isEmpty()) {
+                    item { HorizontalDivider(color = colors.current); SectionHeader("Public Transport") }
+                    if (trip.publicTransportFees.isEmpty()) {
+                        item { Text("No public transport fees.", fontSize = 14.sp, color = colors.comment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                    }
+                    items(trip.publicTransportFees, key = { it.id }) { ptf ->
+                        PriceItemCard(ptf.description, ptf.price, ptf.currency, if (ptf.isAutoGenerated) "auto" else null, { editingPublicTransport = ptf }, { publicTransportToDelete = ptf })
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { showAddPublicTransportDialog = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                            Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Transport Fee")
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
             }
 
             // ══════════════ ADDITIONAL FEES ══════════════
-            item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Additional Fees") }
+            item { HorizontalDivider(color = colors.current); SectionHeader("Additional Fees") }
             if (trip.additionalFees.isEmpty()) {
-                item { Text("No additional fees.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
+                item { Text("No additional fees.", fontSize = 14.sp, color = colors.comment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
             }
             items(trip.additionalFees, key = { it.id }) { fee ->
                 PriceItemCard(fee.name, fee.price, fee.currency, null, { editingFee = fee }, { feeToDelete = fee })
@@ -342,17 +403,48 @@ fun TravelSettingsScreen(
     }
 
     if (showAddTicketDialog) {
-        PriceEditDialog("Add Plane Ticket", "", "", currencies.value, trip.displayCurrency,
-            { n, p, c -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets + PlaneTicket(name = n, price = p, currency = c))); showAddTicketDialog = false },
+        PlaneTicketEditDialog("Add Plane Ticket", PlaneTicket(), currencies.value, trip.displayCurrency,
+            { ticket -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets + ticket)); showAddTicketDialog = false },
             { showAddTicketDialog = false })
     }
     editingTicket?.let { t ->
-        PriceEditDialog("Edit Ticket", t.name, if (t.price > 0) t.price.toString() else "", currencies.value, t.currency,
-            { n, p, c -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.map { if (it.id == t.id) it.copy(name = n, price = p, currency = c) else it })); editingTicket = null },
+        PlaneTicketEditDialog("Edit Ticket", t, currencies.value, t.currency,
+            { ticket -> tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.map { if (it.id == t.id) ticket.copy(id = t.id) else it })); editingTicket = null },
             { editingTicket = null })
     }
     ticketToDelete?.let { t ->
-        DeleteConfirmDialog("Delete Ticket", t.name, { tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.filter { it.id != t.id })); ticketToDelete = null }, { ticketToDelete = null })
+        val label = t.fromAirport.ifBlank { null }?.let { from -> "${from} → ${t.toAirport.ifBlank { "?" }}" } ?: t.name
+        DeleteConfirmDialog("Delete Ticket", label, { tripViewModel.updateTrip(trip.copy(planeTickets = trip.planeTickets.filter { it.id != t.id })); ticketToDelete = null }, { ticketToDelete = null })
+    }
+
+    // Car Rental dialogs
+    if (showAddCarRentalDialog) {
+        PriceEditDialog("Add Car Rental", "", "", currencies.value, trip.displayCurrency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(carRentals = trip.carRentals + CarRental(name = n, price = p, currency = c))); showAddCarRentalDialog = false },
+            { showAddCarRentalDialog = false })
+    }
+    editingCarRental?.let { r ->
+        PriceEditDialog("Edit Car Rental", r.name, if (r.price > 0) r.price.toString() else "", currencies.value, r.currency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(carRentals = trip.carRentals.map { if (it.id == r.id) it.copy(name = n, price = p, currency = c) else it })); editingCarRental = null },
+            { editingCarRental = null })
+    }
+    carRentalToDelete?.let { r ->
+        DeleteConfirmDialog("Delete Car Rental", r.name, { tripViewModel.updateTrip(trip.copy(carRentals = trip.carRentals.filter { it.id != r.id })); carRentalToDelete = null }, { carRentalToDelete = null })
+    }
+
+    // Public Transport dialogs
+    if (showAddPublicTransportDialog) {
+        PriceEditDialog("Add Transport Fee", "", "", currencies.value, trip.displayCurrency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(publicTransportFees = trip.publicTransportFees + PublicTransportFee(description = n, price = p, currency = c, isAutoGenerated = false))); showAddPublicTransportDialog = false },
+            { showAddPublicTransportDialog = false })
+    }
+    editingPublicTransport?.let { ptf ->
+        PriceEditDialog("Edit Transport Fee", ptf.description, if (ptf.price > 0) ptf.price.toString() else "", currencies.value, ptf.currency,
+            { n, p, c -> tripViewModel.updateTrip(trip.copy(publicTransportFees = trip.publicTransportFees.map { if (it.id == ptf.id) it.copy(description = n, price = p, currency = c, isAutoGenerated = false) else it })); editingPublicTransport = null },
+            { editingPublicTransport = null })
+    }
+    publicTransportToDelete?.let { ptf ->
+        DeleteConfirmDialog("Delete Transport Fee", ptf.description, { tripViewModel.updateTrip(trip.copy(publicTransportFees = trip.publicTransportFees.filter { it.id != ptf.id })); publicTransportToDelete = null }, { publicTransportToDelete = null })
     }
 
     if (showAddFeeDialog) {
@@ -380,14 +472,14 @@ fun TravelSettingsScreen(
                         showMissingKeyDialog = false
                         onApiKeySettings()
                     }
-                ) { Text("Set API Key", color = DraculaGreen) }
+                ) { Text("Set API Key", color = colors.green) }
             },
             dismissButton = {
                 TextButton(onClick = { showMissingKeyDialog = false }) { Text("Cancel") }
             },
-            containerColor = DraculaCurrent,
-            titleContentColor = DraculaForeground,
-            textContentColor = DraculaForeground,
+            containerColor = colors.current,
+            titleContentColor = colors.foreground,
+            textContentColor = colors.foreground,
         )
     }
 }
@@ -396,33 +488,38 @@ fun TravelSettingsScreen(
 
 @Composable
 private fun SectionHeader(text: String) {
-    Text(text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = DraculaPurple,
+    val colors = LocalAppColors.current
+    Text(text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = colors.primary,
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
 }
 
 @Composable
-private fun draculaTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = DraculaPurple, focusedLabelColor = DraculaPurple, cursorColor = DraculaPurple,
-)
+private fun themedTextFieldColors(): TextFieldColors {
+    val colors = LocalAppColors.current
+    return OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = colors.primary, focusedLabelColor = colors.primary, cursorColor = colors.primary,
+    )
+}
 
 
 @Composable
 private fun PriceItemCard(name: String, price: Double, currency: String, badge: String? = null, onClick: () -> Unit, onDelete: () -> Unit) {
+    val colors = LocalAppColors.current
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp).clickable { onClick() },
-        shape = RoundedCornerShape(10.dp), colors = CardDefaults.cardColors(containerColor = DraculaCurrent),
+        shape = RoundedCornerShape(10.dp), colors = CardDefaults.cardColors(containerColor = colors.current),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = DraculaForeground)
-                    if (badge != null) { Spacer(Modifier.width(6.dp)); Text(badge, fontSize = 10.sp, color = DraculaCyan) }
+                    Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.foreground)
+                    if (badge != null) { Spacer(Modifier.width(6.dp)); Text(badge, fontSize = 10.sp, color = colors.accent) }
                 }
                 Text(if (price > 0) "💰 $price $currency" else "Price not set", fontSize = 13.sp,
-                    color = if (price > 0) DraculaGreen else DraculaComment)
+                    color = if (price > 0) colors.green else colors.comment)
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Delete", tint = DraculaRed, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, "Delete", tint = colors.red, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -436,6 +533,7 @@ private fun PriceEditDialog(
     currencies: List<String>, initialCurrency: String,
     onConfirm: (name: String, price: Double, currency: String) -> Unit, onDismiss: () -> Unit,
 ) {
+    val colors = LocalAppColors.current
     var name by remember { mutableStateOf(initialName) }
     var priceText by remember { mutableStateOf(initialPrice) }
     var currency by remember { mutableStateOf(initialCurrency) }
@@ -446,30 +544,175 @@ private fun PriceEditDialog(
         text = {
             Column {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), colors = draculaTextFieldColors())
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), colors = themedTextFieldColors())
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("Price") },
                         placeholder = { Text("0.00") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f), colors = draculaTextFieldColors())
+                        modifier = Modifier.weight(1f), colors = themedTextFieldColors())
                     CurrencyPicker(selected = currency, currencies = currencies, onSelect = { currency = it })
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), priceText.toDoubleOrNull() ?: 0.0, currency) }) { Text("OK", color = DraculaGreen) } },
+        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim(), priceText.toDoubleOrNull() ?: 0.0, currency) }) { Text("OK", color = colors.green) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+        containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
     )
 }
 
 @Composable
 private fun DeleteConfirmDialog(title: String, itemName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = LocalAppColors.current
     AlertDialog(
         onDismissRequest = onDismiss, title = { Text(title) },
         text = { Text("Delete \"${itemName.ifBlank { "(unnamed)" }}\"?") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = DraculaRed) } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete", color = colors.red) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        containerColor = DraculaCurrent, titleContentColor = DraculaForeground, textContentColor = DraculaForeground,
+        containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
+    )
+}
+
+
+/**
+ * Specialised dialog for plane tickets with From/To airport search + quantity.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaneTicketEditDialog(
+    title: String,
+    initial: PlaneTicket,
+    currencies: List<String>,
+    defaultCurrency: String,
+    onConfirm: (PlaneTicket) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    var fromQuery by remember { mutableStateOf(initial.fromAirport) }
+    var toQuery by remember { mutableStateOf(initial.toAirport) }
+    var fromResults by remember { mutableStateOf<List<AirportDatabase.Airport>>(emptyList()) }
+    var toResults by remember { mutableStateOf<List<AirportDatabase.Airport>>(emptyList()) }
+    var priceText by remember { mutableStateOf(if (initial.price > 0) initial.price.toString() else "") }
+    var currency by remember { mutableStateOf(initial.currency.ifBlank { defaultCurrency }) }
+    var quantity by remember { mutableStateOf(initial.quantity.coerceIn(1, 20)) }
+    var quantityExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                // From airport
+                Text("From", fontSize = 12.sp, color = colors.comment)
+                OutlinedTextField(
+                    value = fromQuery,
+                    onValueChange = { fromQuery = it; fromResults = AirportDatabase.search(it) },
+                    placeholder = { Text("City or IATA code") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), colors = themedTextFieldColors(),
+                )
+                if (fromResults.isNotEmpty()) {
+                    Card(
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.current),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column {
+                            fromResults.forEach { airport ->
+                                Text(
+                                    airport.displayName,
+                                    fontSize = 13.sp, color = colors.foreground,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { fromQuery = airport.shortLabel; fromResults = emptyList() }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // To airport
+                Text("To", fontSize = 12.sp, color = colors.comment)
+                OutlinedTextField(
+                    value = toQuery,
+                    onValueChange = { toQuery = it; toResults = AirportDatabase.search(it) },
+                    placeholder = { Text("City or IATA code") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(), colors = themedTextFieldColors(),
+                )
+                if (toResults.isNotEmpty()) {
+                    Card(
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.current),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column {
+                            toResults.forEach { airport ->
+                                Text(
+                                    airport.displayName,
+                                    fontSize = 13.sp, color = colors.foreground,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { toQuery = airport.shortLabel; toResults = emptyList() }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Price + Currency
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = priceText, onValueChange = { priceText = it },
+                        label = { Text("Price / ticket") },
+                        placeholder = { Text("0.00") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = themedTextFieldColors(),
+                    )
+                    CurrencyPicker(selected = currency, currencies = currencies, onSelect = { currency = it })
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Quantity
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Quantity:", fontSize = 14.sp, color = colors.foreground)
+                    ExposedDropdownMenuBox(expanded = quantityExpanded, onExpandedChange = { quantityExpanded = it }) {
+                        OutlinedTextField(
+                            value = quantity.toString(), onValueChange = {}, readOnly = true, singleLine = true,
+                            modifier = Modifier.width(80.dp).menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(quantityExpanded) },
+                            colors = themedTextFieldColors(),
+                        )
+                        ExposedDropdownMenu(expanded = quantityExpanded, onDismissRequest = { quantityExpanded = false }) {
+                            (1..20).forEach { q ->
+                                DropdownMenuItem(text = { Text("$q") }, onClick = { quantity = q; quantityExpanded = false })
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (fromQuery.isNotBlank() || toQuery.isNotBlank()) {
+                    val name = "${fromQuery.ifBlank { "?" }} → ${toQuery.ifBlank { "?" }}"
+                    onConfirm(PlaneTicket(
+                        name = name,
+                        fromAirport = fromQuery.trim(),
+                        toAirport = toQuery.trim(),
+                        price = priceText.toDoubleOrNull() ?: 0.0,
+                        currency = currency,
+                        quantity = quantity,
+                    ))
+                }
+            }) { Text("OK", color = colors.green) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        containerColor = colors.current, titleContentColor = colors.foreground, textContentColor = colors.foreground,
     )
 }

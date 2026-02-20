@@ -328,7 +328,10 @@ private fun autoDetectStartingPoint(
                 withContext(Dispatchers.Main) {
                     val trip = tripViewModel.getTripById(tripId)
                     if (trip != null && trip.startingPoint.isBlank()) {
-                        tripViewModel.updateTrip(trip.copy(startingPoint = name))
+                        tripViewModel.updateTrip(trip.copy(
+                            startingPoint = name,
+                            endingPoint = if (trip.endingPoint.isBlank()) name else trip.endingPoint
+                        ))
                     }
                 }
             }
