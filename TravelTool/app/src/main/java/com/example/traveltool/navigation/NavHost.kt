@@ -4,13 +4,13 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.traveltool.data.Accommodation
 import com.example.traveltool.data.Trip
 import com.example.traveltool.data.TripViewModel
 import com.example.traveltool.ui.screens.*
@@ -57,26 +57,6 @@ fun TravelToolNavHost(navController: NavHostController) {
             TripDatesScreen(
                 tripName = tripName,
                 onNext = { startMillis, endMillis ->
-                    navController.navigate(
-                        "${Screen.TripLocation.route}/$tripName/$startMillis/$endMillis"
-                    )
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Add Trip: Location ──────────────────────────────────
-        composable(
-            "${Screen.TripLocation.route}/{tripName}/{startMillis}/{endMillis}"
-        ) { backStackEntry ->
-            val tripName    = backStackEntry.arguments?.getString("tripName") ?: ""
-            val startMillis = backStackEntry.arguments?.getString("startMillis")?.toLongOrNull() ?: 0L
-            val endMillis   = backStackEntry.arguments?.getString("endMillis")?.toLongOrNull() ?: 0L
-            TripLocationScreen(
-                tripName = tripName,
-                startMillis = startMillis,
-                endMillis = endMillis,
-                onSave = { location ->
                     val hasPerm = ContextCompat.checkSelfPermission(
                         context, Manifest.permission.ACCESS_FINE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
@@ -85,16 +65,8 @@ fun TravelToolNavHost(navController: NavHostController) {
                         name = tripName,
                         startMillis = startMillis,
                         endMillis = endMillis,
-                        location = location,
-                        accommodations = listOf(
-                            Accommodation(
-                                name = location,
-                                startMillis = startMillis,
-                                endMillis = endMillis,
-                                pricePerNight = null,
-                                location = location
-                            )
-                        )
+                        location = "",
+                        accommodations = emptyList()
                     )
                     tripViewModel.addTrip(trip)
 
@@ -121,6 +93,9 @@ fun TravelToolNavHost(navController: NavHostController) {
                 },
                 onTravelSettings = { id ->
                     navController.navigate("${Screen.TravelSettings.route}/$id")
+                },
+                onDailyActivities = { id ->
+                    navController.navigate("${Screen.DailyActivities.route}/$id")
                 },
                 onCurrencySettings = { id ->
                     navController.navigate("${Screen.CurrencySettings.route}/$id")
@@ -177,9 +152,8 @@ fun TravelToolNavHost(navController: NavHostController) {
                 tripViewModel = tripViewModel,
                 onApiKeySettings = {
                     navController.navigate(Screen.ApiKey.route)
-                },                onDayClick = { dayMillis ->
-                    navController.navigate("${Screen.DayDetail.route}/$tripId/$dayMillis")
-                },                onBack = { navController.popBackStack() }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -210,6 +184,19 @@ fun TravelToolNavHost(navController: NavHostController) {
             )
         }
 
+        // ── Daily Activities ───────────────────────────────────
+        composable("${Screen.DailyActivities.route}/{tripId}") { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
+            DailyActivitiesScreen(
+                tripId = tripId,
+                tripViewModel = tripViewModel,
+                onDayClick = { dayMillis ->
+                    navController.navigate("${Screen.DayDetail.route}/$tripId/$dayMillis")
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         // ── Day Detail ─────────────────────────────────────────
         composable("${Screen.DayDetail.route}/{tripId}/{dayMillis}") { backStackEntry ->
             val tripId   = backStackEntry.arguments?.getString("tripId") ?: ""
@@ -218,6 +205,93 @@ fun TravelToolNavHost(navController: NavHostController) {
                 tripId = tripId,
                 dayMillis = dayMillis,
                 tripViewModel = tripViewModel,
+                onAddActivity = {
+                    navController.navigate("${Screen.AddActivity.route}/$tripId/$dayMillis")
+                },
+                onEditActivity = { activityId ->
+                    navController.navigate("${Screen.EditActivity.route}/$tripId/$activityId")
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Add Activity ───────────────────────────────────────
+        composable("${Screen.AddActivity.route}/{tripId}/{dayMillis}") { backStackEntry ->
+            val tripId    = backStackEntry.arguments?.getString("tripId") ?: ""
+            val dayMillis = backStackEntry.arguments?.getString("dayMillis")?.toLongOrNull() ?: 0L
+
+            // Check for recommendation data passed back via savedStateHandle
+            val savedState = backStackEntry.savedStateHandle
+            val prefillName = savedState.get<String>("rec_name")
+            val prefillLocation = savedState.get<String>("rec_location")
+            val prefillDescription = savedState.get<String>("rec_description")
+            val prefillRating = savedState.get<Double>("rec_rating")
+            val prefillCategory = savedState.get<String>("rec_category")
+            val prefillEatingType = savedState.get<String>("rec_eatingType")
+
+            AddActivityScreen(
+                tripId = tripId,
+                dayMillis = dayMillis,
+                tripViewModel = tripViewModel,
+                onRecommend = {
+                    navController.navigate("${Screen.RecommendActivity.route}/$tripId/$dayMillis")
+                },
+                onBack = { navController.popBackStack() },
+                prefillName = prefillName,
+                prefillLocation = prefillLocation,
+                prefillDescription = prefillDescription,
+                prefillRating = prefillRating,
+                prefillCategory = prefillCategory,
+                prefillEatingType = prefillEatingType,
+            )
+        }
+
+        // ── Edit Activity ──────────────────────────────────────
+        composable("${Screen.EditActivity.route}/{tripId}/{activityId}") { backStackEntry ->
+            val tripId     = backStackEntry.arguments?.getString("tripId") ?: ""
+            val activityId = backStackEntry.arguments?.getString("activityId") ?: ""
+            EditActivityScreen(
+                tripId = tripId,
+                activityId = activityId,
+                tripViewModel = tripViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Recommend Activity ─────────────────────────────────
+        composable("${Screen.RecommendActivity.route}/{tripId}/{dayMillis}") { backStackEntry ->
+            val tripId    = backStackEntry.arguments?.getString("tripId") ?: ""
+            val dayMillis = backStackEntry.arguments?.getString("dayMillis")?.toLongOrNull() ?: 0L
+
+            // Read the Google Maps API key from AndroidManifest metadata
+            val mapsApiKey = remember {
+                try {
+                    val appInfo = context.packageManager.getApplicationInfo(
+                        context.packageName,
+                        android.content.pm.PackageManager.GET_META_DATA
+                    )
+                    appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+                } catch (_: Exception) { "" }
+            }
+
+            RecommendActivityScreen(
+                tripId = tripId,
+                dayMillis = dayMillis,
+                tripViewModel = tripViewModel,
+                apiKey = mapsApiKey,
+                onSelectPlace = { name, location, description, rating, photoUrl, category, eatingType ->
+                    // Pass the selected place data back to AddActivity via the previous backstack entry
+                    val addActivityEntry = navController.previousBackStackEntry
+                    addActivityEntry?.savedStateHandle?.apply {
+                        set("rec_name", name)
+                        set("rec_location", location)
+                        set("rec_description", description)
+                        set("rec_rating", rating)
+                        set("rec_category", category)
+                        set("rec_eatingType", eatingType)
+                    }
+                    navController.popBackStack()
+                },
                 onBack = { navController.popBackStack() }
             )
         }

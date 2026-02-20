@@ -76,6 +76,58 @@ data class OtherSpending(
 )
 
 /**
+ * Per-day plan: stores departure time for the day's activities.
+ */
+data class DayPlan(
+    val dayMillis: Long = 0L,
+    val departureHour: Int = 9,
+    val departureMinute: Int = 0,
+)
+
+/**
+ * Activity category.
+ */
+enum class ActivityCategory(val label: String, val emoji: String) {
+    HIKING("Hiking", "🥾"),
+    MUSEUM("Museum", "🏛️"),
+    NICE_SIGHT("Nice sight", "📸"),
+    BEACH("Beach", "🏖️"),
+    WELLNESS("Wellness", "🧖"),
+    EATING("Eating", "🍽️"),
+    OTHER("Other", "📌");
+}
+
+/**
+ * Sub-category for eating activities.
+ */
+enum class EatingType(val label: String) {
+    BREAKFAST("Breakfast"),
+    BRUNCH("Brunch"),
+    LUNCH("Lunch"),
+    DINNER("Dinner");
+}
+
+/**
+ * A planned activity within a single trip day.
+ * Activities chain sequentially: driving time is from the previous activity
+ * (or accommodation for the first activity).
+ */
+data class Activity(
+    val id: String = UUID.randomUUID().toString(),
+    val dayMillis: Long = 0L,
+    val name: String = "",
+    val location: String = "",
+    val durationMinutes: Int = 60,
+    val orderIndex: Int = 0,
+    val drivingTimeToMinutes: Int? = null,
+    val description: String = "",
+    val rating: Double? = null,
+    val photoUrl: String? = null,
+    val category: String = "",
+    val eatingType: String = "",
+)
+
+/**
  * Represents a saved trip.
  */
 data class Trip(
@@ -83,7 +135,7 @@ data class Trip(
     val name: String,
     val startMillis: Long,
     val endMillis: Long,
-    val location: String,
+    val location: String = "",
     val accommodations: List<Accommodation> = emptyList(),
     val startingPoint: String = "",
     val travelMode: TravelMode = TravelMode.CAR,
@@ -95,6 +147,8 @@ data class Trip(
     val additionalFees: List<AdditionalFee> = emptyList(),
     val dailySpendings: List<DailySpending> = emptyList(),
     val otherSpendings: List<OtherSpending> = emptyList(),
+    val activities: List<Activity> = emptyList(),
+    val dayPlans: List<DayPlan> = emptyList(),
     val displayCurrency: String = "EUR",
     val estimatedDrivingDistanceKm: Double? = null
 ) {

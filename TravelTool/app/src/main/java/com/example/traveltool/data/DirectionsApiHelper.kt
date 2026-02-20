@@ -345,4 +345,84 @@ Example: {"totalDistanceKm":1250,"legs":[{"from":"Budapest","to":"Vienna","dista
 
         return null
     }
+
+    /**
+     * Estimate one-way driving time between two locations using OpenAI GPT.
+     * Returns the estimated driving time in minutes, or null on failure.
+     */
+    suspend fun estimateDrivingTime(
+        from: String,
+        to: String,
+        openAiApiKey: String,
+        model: String = "gpt-4o-mini"
+    ): Int? = withContext(Dispatchers.IO) {
+        if (from.isBlank() || to.isBlank() || openAiApiKey.isBlank()) {
+            return@withContext null
+        }
+
+        val prompt = """You are an expert on driving routes and travel times. Estimate the driving time by car from "$from" to "$to" using realistic highway/motorway routes.
+
+You MUST respond with ONLY a single JSON object. No text before or after. No markdown.
+The object must have exactly these fields:
+- "drivingTimeMinutes": estimated one-way driving time in minutes (integer)
+- "distanceKm": estimated driving distance in km (integer)
+
+Example: {"drivingTimeMinutes":120,"distanceKm":150}"""
+
+        try {
+            val messagesJson = gson.toJson(listOf(
+                mapOf("role" to "user", "content" to prompt)
+            ))
+            val bodyJson = """{"model":"$model","messages":$messagesJson,"temperature":0.2,"max_tokens":200}"""
+
+            Log.d(TAG, "Estimating driving time from $from to $to...")
+
+            val request = Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .addHeader("Authorization", "Bearer $openAiApiKey")
+                .addHeader("Content-Type", "application/json")
+                .post(bodyJson.toRequestBody(JSON_MEDIA))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (!response.isSuccessful) {
+                Log.e(TAG, "API error ${response.code}: $responseBody")
+                return@withContext null
+            }
+
+            val json = JsonParser.parseString(responseBody).asJsonObject
+            val choices = json.getAsJsonArray("choices")
+            if (choices == null || choices.size() == 0) return@withContext null
+
+            val content = choices[0].asJsonObject
+                .getAsJsonObject("message")
+                .get("content").asString.trim()
+
+            Log.d(TAG, "Driving time GPT response: $content")
+
+            val cleaned = content
+                .replace("```json", "")
+                .replace("```", "")
+                .trim()
+
+            val resultJson = try {
+                JsonParser.parseString(cleaned).asJsonObject
+            } catch (_: Exception) {
+                val start = content.indexOf('{')
+                val end = content.lastIndexOf('}')
+                if (start >= 0 && end > start) {
+                    try {
+                        JsonParser.parseString(content.substring(start, end + 1)).asJsonObject
+                    } catch (_: Exception) { null }
+                } else null
+            }
+
+            resultJson?.get("drivingTimeMinutes")?.asInt
+        } catch (e: Exception) {
+            Log.e(TAG, "Driving time estimation exception: ${e.message}", e)
+            null
+        }
+    }
 }

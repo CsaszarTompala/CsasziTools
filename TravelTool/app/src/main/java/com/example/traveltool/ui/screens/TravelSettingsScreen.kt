@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -28,7 +27,7 @@ import com.example.traveltool.ui.theme.*
 import kotlinx.coroutines.launch
 
 /**
- * Travel specifics: car/plane mode, fuel, tolls, plane tickets, additional fees, daily activities.
+ * Travel mode settings: car/plane mode, fuel, tolls, plane tickets, additional fees.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,7 +35,6 @@ fun TravelSettingsScreen(
     tripId: String,
     tripViewModel: TripViewModel,
     onApiKeySettings: () -> Unit,
-    onDayClick: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val trip = tripViewModel.getTripById(tripId)
@@ -73,23 +71,10 @@ fun TravelSettingsScreen(
     var showMissingKeyDialog by remember { mutableStateOf(false) }
     var isEstimatingFuel by remember { mutableStateOf(false) }
 
-    // Daily activities: generate list of days
-    val oneDayMs = 24 * 60 * 60 * 1000L
-    val tripDays = remember(trip.startMillis, trip.endMillis) {
-        val days = mutableListOf<Long>()
-        var d = trip.startMillis
-        while (d < trip.endMillis) {
-            days.add(d)
-            d += oneDayMs
-        }
-        days
-    }
-    val hasAnyAccommodation = trip.accommodations.isNotEmpty()
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Travel Specifics") },
+                title = { Text("Travel Mode") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -332,104 +317,6 @@ fun TravelSettingsScreen(
                     Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Fee")
                 }
                 Spacer(Modifier.height(12.dp))
-            }
-
-            // ══════════════ DAILY ACTIVITIES ══════════════
-            item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Daily Activities") }
-
-            if (!hasAnyAccommodation) {
-                item {
-                    Text(
-                        "Add accommodations to unlock daily activity planning.",
-                        fontSize = 14.sp, color = DraculaComment,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    )
-                }
-            } else {
-                items(tripDays.size) { index ->
-                    val dayMillis = tripDays[index]
-                    val dayNumber = index + 1
-                    val dayDateFormat = java.text.SimpleDateFormat("EEE, MMM d", java.util.Locale.getDefault())
-                    val dayLabel = dayDateFormat.format(java.util.Date(dayMillis))
-
-                    // Check if this day has accommodation coverage
-                    val coveringAccom = trip.accommodations.find { accom ->
-                        accom.startMillis <= dayMillis && dayMillis < accom.endMillis
-                    } ?: trip.accommodations.find { accom ->
-                        accom.startMillis <= dayMillis && dayMillis <= accom.endMillis
-                    }
-                    val hasCoverage = coveringAccom != null && coveringAccom.location.isNotBlank()
-
-                    // Determine moving/staying
-                    val prevDayAccom = if (index > 0) {
-                        val prevMillis = tripDays[index - 1]
-                        trip.accommodations.find { it.startMillis <= prevMillis && prevMillis < it.endMillis }
-                            ?: trip.accommodations.find { it.startMillis <= prevMillis && prevMillis <= it.endMillis }
-                    } else null
-
-                    val isMoving = when {
-                        index == 0 -> true  // first day — traveling from home
-                        coveringAccom == null || prevDayAccom == null -> false
-                        coveringAccom.location != prevDayAccom.location -> true
-                        else -> false
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 3.dp)
-                            .then(
-                                if (hasCoverage) Modifier.clickable { onDayClick(dayMillis) }
-                                else Modifier
-                            ),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (hasCoverage) DraculaCurrent else DraculaCurrent.copy(alpha = 0.4f)
-                        ),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = if (isMoving) "🚗" else "🏨",
-                                fontSize = 20.sp,
-                                modifier = Modifier.width(32.dp),
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    text = "Day $dayNumber — $dayLabel",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (hasCoverage) DraculaForeground else DraculaComment,
-                                )
-                                if (coveringAccom != null && coveringAccom.location.isNotBlank()) {
-                                    Text(
-                                        text = coveringAccom.location,
-                                        fontSize = 12.sp,
-                                        color = DraculaComment,
-                                    )
-                                } else {
-                                    Text(
-                                        "No accommodation — tap to add",
-                                        fontSize = 12.sp,
-                                        color = DraculaYellow.copy(alpha = 0.7f),
-                                    )
-                                }
-                            }
-                            if (hasCoverage) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = DraculaComment,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
-                }
             }
 
             item {

@@ -70,7 +70,7 @@ fun TripDatesScreen(
                             contentColor = MaterialTheme.colorScheme.background,
                         )
                     ) {
-                        Text("Next", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Create Trip", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

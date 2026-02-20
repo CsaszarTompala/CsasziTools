@@ -69,6 +69,9 @@ dependencies {
     // Encrypted storage for API keys
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // Image loading (Coil) for Places API photos
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

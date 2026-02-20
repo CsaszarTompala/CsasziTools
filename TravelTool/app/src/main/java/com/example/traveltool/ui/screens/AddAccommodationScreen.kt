@@ -41,7 +41,9 @@ import java.util.*
 /**
  * Add a new accommodation to a trip.
  *
- * If there are no existing accommodations, the dates are locked to the full trip range.
+ * Dates already occupied by existing accommodations are blocked from selection,
+ * except boundary days (start/end of existing accommodations) which can be
+ * used for chaining accommodations.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,12 +59,12 @@ fun AddAccommodationScreen(
         return
     }
 
-    val isFirstAccommodation = trip.accommodations.isEmpty()
+    val oneDayMs = 24 * 60 * 60 * 1000L
 
     var name by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
     var priceCurrency by remember { mutableStateOf(trip.displayCurrency) }
-    var accomLocation by remember { mutableStateOf(trip.location) }
+    var accomLocation by remember { mutableStateOf("") }
     var markerPosition by remember { mutableStateOf<LatLng?>(null) }
 
     val context = LocalContext.current
@@ -70,26 +72,6 @@ fun AddAccommodationScreen(
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(48.8566, 2.3522), 5f)
-    }
-
-    // Pre-search trip location on first composition
-    LaunchedEffect(Unit) {
-        if (accomLocation.isNotBlank()) {
-            withContext(Dispatchers.IO) {
-                try {
-                    @Suppress("DEPRECATION")
-                    val geocoder = Geocoder(context, Locale.getDefault())
-                    val addresses = geocoder.getFromLocationName(accomLocation.trim(), 1)
-                    if (!addresses.isNullOrEmpty()) {
-                        val pos = LatLng(addresses[0].latitude, addresses[0].longitude)
-                        markerPosition = pos
-                        cameraPositionState.move(
-                            CameraUpdateFactory.newLatLngZoom(pos, 12f)
-                        )
-                    }
-                } catch (_: Exception) { }
-            }
-        }
     }
 
     fun searchLocation() {
@@ -114,17 +96,38 @@ fun AddAccommodationScreen(
         }
     }
 
+    // Compute which days are occupied by any existing accommodation (all blocked)
+    val existingAccommodations = trip.accommodations
+    val occupiedDays = remember(existingAccommodations) {
+        val set = mutableSetOf<Long>()
+        for (accom in existingAccommodations) {
+            var d = accom.startMillis
+            while (d <= accom.endMillis) {
+                set.add(normalizeToDay(d))
+                d += oneDayMs
+            }
+        }
+        set
+    }
+
+    // Trip range normalized for visual highlighting
+    val tripStartDay = remember(trip.startMillis) { normalizeToDay(trip.startMillis) }
+    val tripEndDay = remember(trip.endMillis) { normalizeToDay(trip.endMillis) }
+
     val selectableDates = object : SelectableDates {
         override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-            return utcTimeMillis >= trip.startMillis && utcTimeMillis <= trip.endMillis
+            val normalized = normalizeToDay(utcTimeMillis)
+            // Must be within trip range
+            if (normalized < tripStartDay || normalized > tripEndDay) return false
+            // All occupied days are blocked
+            if (normalized in occupiedDays) return false
+            return true
         }
     }
 
     val dateRangePickerState = rememberDateRangePickerState(
         initialDisplayMode = DisplayMode.Picker,
         selectableDates = selectableDates,
-        initialSelectedStartDateMillis = if (isFirstAccommodation) trip.startMillis else null,
-        initialSelectedEndDateMillis = if (isFirstAccommodation) trip.endMillis else null,
         initialDisplayedMonthMillis = trip.startMillis,
     )
 
@@ -308,49 +311,51 @@ fun AddAccommodationScreen(
             Spacer(Modifier.height(12.dp))
 
             // --- Date selection ---
-            if (isFirstAccommodation) {
-                // Locked to full trip dates
-                Text(
-                    text = "Dates: ${dateFormat.format(Date(trip.startMillis))} – ${dateFormat.format(Date(trip.endMillis))} (full trip)",
-                    fontSize = 14.sp,
-                    color = DraculaComment,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-            } else {
-                Text(
-                    text = "Select dates (only trip dates available)",
-                    fontSize = 14.sp,
-                    color = DraculaComment,
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                )
+            Text(
+                text = "Select dates (greyed-out dates are occupied or outside trip)",
+                fontSize = 14.sp,
+                color = DraculaComment,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
 
-                DateRangePicker(
-                    state = dateRangePickerState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(500.dp),
-                    showModeToggle = false,
-                    title = null,
-                    headline = {
-                        Text(
-                            text = if (rangeReady) "Dates selected ✓"
-                                   else if (startMillis != null) "Now pick the end date"
-                                   else "Tap the start date",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                        )
-                    },
-                    colors = DatePickerDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        selectedDayContainerColor = DraculaPurple,
-                        todayDateBorderColor = DraculaPurple,
-                        dayInSelectionRangeContainerColor = DraculaPurple.copy(alpha = .25f),
-                        todayContentColor = DraculaPurple,
-                    ),
-                )
-            }
+            DateRangePicker(
+                state = dateRangePickerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(500.dp),
+                showModeToggle = false,
+                title = null,
+                headline = {
+                    Text(
+                        text = if (rangeReady) "Dates selected ✓"
+                               else if (startMillis != null) "Now pick the end date"
+                               else "Tap the start date",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                },
+                colors = DatePickerDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    selectedDayContainerColor = DraculaPurple,
+                    todayDateBorderColor = DraculaGreen,
+                    dayInSelectionRangeContainerColor = DraculaPurple.copy(alpha = .25f),
+                    todayContentColor = DraculaGreen,
+                    dayContentColor = DraculaGreen,
+                ),
+            )
 
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+/** Normalize a timestamp to the start of its UTC day. */
+private fun normalizeToDay(millis: Long): Long {
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    cal.timeInMillis = millis
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
 }

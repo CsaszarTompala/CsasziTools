@@ -60,7 +60,6 @@ fun HomeScreen(
                 onClick = onAddTrip,
                 containerColor = DraculaGreen,
                 contentColor = MaterialTheme.colorScheme.background,
-                modifier = Modifier.navigationBarsPadding(),
             ) {
                 Text("+ Add Trip", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
@@ -181,12 +180,14 @@ private fun TripCard(
                     fontSize = 14.sp,
                     color = DraculaOrange,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "📍 ${trip.location}",
-                    fontSize = 14.sp,
-                    color = DraculaForeground,
-                )
+                if (trip.location.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "📍 ${trip.location}",
+                        fontSize = 14.sp,
+                        color = DraculaForeground,
+                    )
+                }
             }
             IconButton(
                 onClick = onDelete,

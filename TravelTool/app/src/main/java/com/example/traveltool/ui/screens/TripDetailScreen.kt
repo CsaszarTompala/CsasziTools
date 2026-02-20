@@ -97,6 +97,7 @@ fun TripDetailScreen(
     onBack: () -> Unit,
     onAccommodation: (String) -> Unit,
     onTravelSettings: (String) -> Unit,
+    onDailyActivities: (String) -> Unit,
     onCurrencySettings: (String) -> Unit,
     onSpendings: (String) -> Unit
 ) {
@@ -113,8 +114,9 @@ fun TripDetailScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(trip.name) }
 
-    var showLocationDialog by remember { mutableStateOf(false) }
     var newLocation by remember { mutableStateOf(trip.location) }
+
+    var showDatesDialog by remember { mutableStateOf(false) }
 
     var showStartingPointDialog by remember { mutableStateOf(false) }
     var newStartingPoint by remember { mutableStateOf(trip.startingPoint) }
@@ -148,7 +150,13 @@ fun TripDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            newName = trip.name
+                            showRenameDialog = true
+                        }
+                    ) {
                         Text(trip.name)
                         if (trip.hasWarning) {
                             Spacer(Modifier.width(8.dp))
@@ -179,21 +187,28 @@ fun TripDetailScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
-            // --- Trip info header ---
+            // --- Trip info header (tappable to edit location & dates) ---
             Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                modifier = Modifier
+                    .clickable {
+                        newLocation = trip.location
+                        showDatesDialog = true
+                    }
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
                 Text(
                     text = "$startDate – $endDate",
                     fontSize = 14.sp,
                     color = DraculaOrange,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "📍 ${trip.location}",
-                    fontSize = 14.sp,
-                    color = DraculaComment,
-                )
+                if (trip.location.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "📍 ${trip.location}",
+                        fontSize = 14.sp,
+                        color = DraculaComment,
+                    )
+                }
             }
 
             HorizontalDivider(color = DraculaCurrent)
@@ -222,30 +237,6 @@ fun TripDetailScreen(
 
             HorizontalDivider(color = DraculaCurrent)
 
-            // --- Edit Name ---
-            SettingsRow(
-                title = "Edit Name",
-                subtitle = trip.name,
-                onClick = {
-                    newName = trip.name
-                    showRenameDialog = true
-                }
-            )
-
-            HorizontalDivider(color = DraculaCurrent)
-
-            // --- Edit Location ---
-            SettingsRow(
-                title = "Edit Location",
-                subtitle = trip.location,
-                onClick = {
-                    newLocation = trip.location
-                    showLocationDialog = true
-                }
-            )
-
-            HorizontalDivider(color = DraculaCurrent)
-
             // --- Starting Point ---
             SettingsRow(
                 title = "Starting Point",
@@ -268,15 +259,33 @@ fun TripDetailScreen(
 
             HorizontalDivider(color = DraculaCurrent)
 
-            // --- Travel Specifics ---
+            // --- Travel Mode ---
             SettingsRow(
-                title = "Travel Specifics",
+                title = "Travel Mode",
                 subtitle = when (trip.travelMode) {
                     com.example.traveltool.data.TravelMode.CAR -> "Car" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
                     com.example.traveltool.data.TravelMode.MICROBUS -> "Microbus" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
                     com.example.traveltool.data.TravelMode.PLANE -> "Plane"
                 },
                 onClick = { onTravelSettings(tripId) }
+            )
+
+            HorizontalDivider(color = DraculaCurrent)
+
+            // --- Daily Activities ---
+            SettingsRow(
+                title = "Daily Activities",
+                subtitle = "Day-by-day activity planning",
+                onClick = { onDailyActivities(tripId) }
+            )
+
+            HorizontalDivider(color = DraculaCurrent)
+
+            // --- Spendings ---
+            SettingsRow(
+                title = "Spendings",
+                subtitle = "Daily & other expenses",
+                onClick = { onSpendings(tripId) }
             )
 
             HorizontalDivider(color = DraculaCurrent)
@@ -295,15 +304,6 @@ fun TripDetailScreen(
                 title = "Currencies & Exchange Rates",
                 subtitle = "Manage currencies, edit rates",
                 onClick = { onCurrencySettings(tripId) }
-            )
-
-            HorizontalDivider(color = DraculaCurrent)
-
-            // --- Spendings ---
-            SettingsRow(
-                title = "Spendings",
-                subtitle = "Daily & other expenses",
-                onClick = { onSpendings(tripId) }
             )
 
             HorizontalDivider(color = DraculaCurrent)
@@ -348,42 +348,139 @@ fun TripDetailScreen(
         )
     }
 
-    // --- Edit Location dialog ---
-    if (showLocationDialog) {
+    // --- Edit Location & Dates dialog ---
+    if (showDatesDialog) {
+        var editStartMillis by remember { mutableStateOf(trip.startMillis) }
+        var editEndMillis by remember { mutableStateOf(trip.endMillis) }
+        var showStartDatePicker by remember { mutableStateOf(false) }
+        var showEndDatePicker by remember { mutableStateOf(false) }
+
+        val editDateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+        val editStartStr = remember(editStartMillis) { editDateFormat.format(Date(editStartMillis)) }
+        val editEndStr = remember(editEndMillis) { editDateFormat.format(Date(editEndMillis)) }
+
         AlertDialog(
-            onDismissRequest = { showLocationDialog = false },
-            title = { Text("Edit Location") },
+            onDismissRequest = { showDatesDialog = false },
+            title = { Text("Edit Location & Dates") },
             text = {
-                OutlinedTextField(
-                    value = newLocation,
-                    onValueChange = { newLocation = it },
-                    label = { Text("Location") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DraculaPurple,
-                        focusedLabelColor = DraculaPurple,
-                        cursorColor = DraculaPurple,
+                Column {
+                    OutlinedTextField(
+                        value = newLocation,
+                        onValueChange = { newLocation = it },
+                        label = { Text("Location") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DraculaPurple,
+                            focusedLabelColor = DraculaPurple,
+                            cursorColor = DraculaPurple,
+                        )
                     )
-                )
+                    Spacer(Modifier.height(16.dp))
+                    Text("Start Date", fontSize = 13.sp, color = DraculaComment)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showStartDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("📅 $editStartStr", color = DraculaOrange)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("End Date", fontSize = 13.sp, color = DraculaComment)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showEndDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("📅 $editEndStr", color = DraculaOrange)
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (newLocation.isNotBlank()) {
-                            tripViewModel.updateTrip(trip.copy(location = newLocation.trim()))
-                            showLocationDialog = false
+                        if (newLocation.isNotBlank() && editEndMillis >= editStartMillis) {
+                            tripViewModel.updateTrip(
+                                trip.copy(
+                                    location = newLocation.trim(),
+                                    startMillis = editStartMillis,
+                                    endMillis = editEndMillis
+                                )
+                            )
+                            showDatesDialog = false
                         }
                     }
                 ) { Text("OK", color = DraculaGreen) }
             },
             dismissButton = {
-                TextButton(onClick = { showLocationDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatesDialog = false }) { Text("Cancel") }
             },
             containerColor = DraculaCurrent,
             titleContentColor = DraculaForeground,
             textContentColor = DraculaForeground,
         )
+
+        // Start date picker
+        if (showStartDatePicker) {
+            val startPickerState = rememberDatePickerState(
+                initialSelectedDateMillis = editStartMillis
+            )
+            DatePickerDialog(
+                onDismissRequest = { showStartDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        startPickerState.selectedDateMillis?.let { editStartMillis = it }
+                        showStartDatePicker = false
+                    }) { Text("OK", color = DraculaGreen) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
+                },
+                colors = DatePickerDefaults.colors(containerColor = DraculaCurrent),
+            ) {
+                DatePicker(
+                    state = startPickerState,
+                    showModeToggle = false,
+                    colors = DatePickerDefaults.colors(
+                        containerColor = DraculaCurrent,
+                        selectedDayContainerColor = DraculaPurple,
+                        todayDateBorderColor = DraculaPurple,
+                        todayContentColor = DraculaPurple,
+                    ),
+                )
+            }
+        }
+
+        // End date picker
+        if (showEndDatePicker) {
+            val endPickerState = rememberDatePickerState(
+                initialSelectedDateMillis = editEndMillis
+            )
+            DatePickerDialog(
+                onDismissRequest = { showEndDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        endPickerState.selectedDateMillis?.let { editEndMillis = it }
+                        showEndDatePicker = false
+                    }) { Text("OK", color = DraculaGreen) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
+                },
+                colors = DatePickerDefaults.colors(containerColor = DraculaCurrent),
+            ) {
+                DatePicker(
+                    state = endPickerState,
+                    showModeToggle = false,
+                    colors = DatePickerDefaults.colors(
+                        containerColor = DraculaCurrent,
+                        selectedDayContainerColor = DraculaPurple,
+                        todayDateBorderColor = DraculaPurple,
+                        todayContentColor = DraculaPurple,
+                    ),
+                )
+            }
+        }
     }
 
     // --- Starting Point dialog ---
