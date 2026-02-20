@@ -76,6 +76,13 @@ private fun calculateTotalTripCost(trip: Trip, eurRates: Map<String, Double>, tr
         total += CurrencyManager.convert(spending.amount, spending.currency, trip.displayCurrency, eurRates)
     }
 
+    // Fuel cost (if estimated distance + consumption + price are all available)
+    if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
+        val litres = (trip.estimatedDrivingDistanceKm / 100.0) * trip.fuelConsumption
+        val fuelCost = litres * trip.fuelPricePerLiter
+        total += CurrencyManager.convert(fuelCost, trip.fuelPriceCurrency, trip.displayCurrency, eurRates)
+    }
+
     return total
 }
 
@@ -209,7 +216,7 @@ fun TripDetailScreen(
                         color = DraculaGreen,
                     )
                     Spacer(Modifier.height(4.dp))
-                    Text("Based on accommodations, tolls, tickets, fees & spendings", fontSize = 11.sp, color = DraculaComment)
+                    Text("Based on accommodations, tolls, tickets, fees, fuel & spendings", fontSize = 11.sp, color = DraculaComment)
                 }
             }
 
@@ -261,12 +268,12 @@ fun TripDetailScreen(
 
             HorizontalDivider(color = DraculaCurrent)
 
-            // --- Travel Settings ---
+            // --- Travel Specifics ---
             SettingsRow(
-                title = "Travel Settings",
+                title = "Travel Specifics",
                 subtitle = when (trip.travelMode) {
-                    com.example.traveltool.data.TravelMode.CAR -> "Car" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else ""
-                    com.example.traveltool.data.TravelMode.MICROBUS -> "Microbus" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else ""
+                    com.example.traveltool.data.TravelMode.CAR -> "Car" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
+                    com.example.traveltool.data.TravelMode.MICROBUS -> "Microbus" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
                     com.example.traveltool.data.TravelMode.PLANE -> "Plane"
                 },
                 onClick = { onTravelSettings(tripId) }

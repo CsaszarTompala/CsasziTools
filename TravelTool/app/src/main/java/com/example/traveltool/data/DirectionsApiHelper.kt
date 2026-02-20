@@ -69,11 +69,15 @@ object DirectionsApiHelper {
                 waypoints.add(accom.location)
             }
         }
-        if (waypoints.last() != startingPoint) {
+        // Always append the return leg to the starting point
+        if (waypoints.size < 2 || waypoints.last() != startingPoint) {
             waypoints.add(startingPoint)
         }
 
-        val routeDescription = waypoints.zipWithNext().joinToString("\n") { (a, b) -> "$a → $b" }
+        val routeDescription = waypoints.zipWithNext().mapIndexed { i, (a, b) ->
+            val label = if (i == waypoints.size - 2) " (return journey home)" else ""
+            "${i + 1}. $a → $b$label"
+        }.joinToString("\n")
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val dateRange = if (tripStartMillis > 0 && tripEndMillis > 0) {
@@ -88,33 +92,37 @@ object DirectionsApiHelper {
             TravelMode.PLANE -> "a car" // fallback
         }
 
-        val prompt = """You are an expert on European road tolls, vignettes, and motorway fees. I am driving $vehicleType on the following route and I need to know ALL road fees.
+        val prompt = """You are an expert on European road tolls, vignettes, motorway fees, and ferry crossings. I am driving $vehicleType on the following route and I need to know ALL road fees and required ferry crossings.
 $dateRange
 
-My complete route:
+My complete route (including the return journey home):
 $routeDescription
 
 List ALL of the following that apply:
 1. Country vignettes / e-vignettes / motorway stickers (e.g. Austrian "Vignette", Hungarian "e-Matrica / e-vignette", Czech "e-Dálniční známka", Slovenian "e-Vinjeta", Swiss "Vignette", etc.)
-2. Specific toll sections (tunnels, bridges, specific motorway sections that charge per-use)
-3. Any other mandatory road fees for using motorways/highways
+2. Specific toll sections (tunnels, bridges, specific motorway sections that charge per-use) — if a per-use toll must be paid in BOTH directions, list it TWICE (once for each direction)
+3. Ferry crossings that are necessary or common for driving this route (include the price per vehicle, one-way)
+4. Any other mandatory road fees for using motorways/highways
+
+IMPORTANT: The route includes a RETURN JOURNEY home. Make sure you include all tolls, ferries, and vignettes needed for the ENTIRE route including the way back!
 
 RULES:
 - Include ALL countries the route passes through (including transit countries!)
 - For vignettes, use the shortest duration option (e.g. 10-day)
 - Each vignette only needs to be listed ONCE even if multiple route segments cross that country
+- Per-use tolls (tunnels, bridges) that are crossed in BOTH directions must be listed TWICE with direction noted
 - Give realistic current prices in EUR
 - For ${if (travelMode == TravelMode.MICROBUS) "a minibus/microbus - use the appropriate vehicle category which may be more expensive than a car" else "a regular car - use category 1 / passenger car prices"}
-- Do NOT include fuel costs, only road/toll fees
+- Do NOT include fuel costs, only road/toll/ferry fees
 - If a country has no motorway tolls or vignettes, do NOT list it
 
 You MUST respond with ONLY a JSON array. No text before or after. No markdown formatting. Just the raw JSON array.
 Each object must have exactly these fields:
-- "name": descriptive name including country (string)
+- "name": descriptive name including country and direction if applicable (string)
 - "price": price in EUR (number)
 - "currency": "EUR" (string)
 
-Example: [{"name":"Hungary e-Matrica 10-day vignette","price":22.0,"currency":"EUR"},{"name":"Austria 10-day vignette","price":9.90,"currency":"EUR"}]
+Example: [{"name":"Hungary e-Matrica 10-day vignette","price":22.0,"currency":"EUR"},{"name":"Austria 10-day vignette","price":9.90,"currency":"EUR"},{"name":"Karawanken Tunnel (Austria→Slovenia)","price":7.90,"currency":"EUR"}]
 
 If there are no tolls at all, respond with: []"""
 
@@ -181,6 +189,125 @@ If there are no tolls at all, respond with: []"""
         } catch (e: Exception) {
             Log.e(TAG, "Exception: ${e.message}", e)
             emptyList()
+        }
+    }
+
+    /**
+     * Estimate total driving distance for a trip using OpenAI GPT.
+     * Returns the estimated distance in km, or null on failure.
+     */
+    suspend fun estimateDrivingDistance(
+        startingPoint: String,
+        accommodations: List<Accommodation>,
+        openAiApiKey: String,
+        travelMode: TravelMode = TravelMode.CAR,
+        model: String = "gpt-4o-mini"
+    ): Double? = withContext(Dispatchers.IO) {
+        if (startingPoint.isBlank() || accommodations.isEmpty() || openAiApiKey.isBlank()) {
+            return@withContext null
+        }
+
+        val sortedAccoms = accommodations.sortedBy { it.startMillis }
+            .filter { it.location.isNotBlank() }
+
+        if (sortedAccoms.isEmpty()) return@withContext null
+
+        // Build route
+        val waypoints = mutableListOf(startingPoint)
+        for (accom in sortedAccoms) {
+            if (waypoints.last() != accom.location) {
+                waypoints.add(accom.location)
+            }
+        }
+        if (waypoints.size < 2 || waypoints.last() != startingPoint) {
+            waypoints.add(startingPoint)
+        }
+
+        val routeDescription = waypoints.zipWithNext().mapIndexed { i, (a, b) ->
+            val label = if (i == waypoints.size - 2) " (return home)" else ""
+            "${i + 1}. $a → $b$label"
+        }.joinToString("\n")
+
+        val vehicleType = when (travelMode) {
+            TravelMode.CAR -> "a regular passenger car"
+            TravelMode.MICROBUS -> "a minibus / microbus"
+            TravelMode.PLANE -> "a car"
+        }
+
+        val prompt = """You are an expert on European driving routes and distances. I am driving $vehicleType on the following route. I need to know the TOTAL driving distance in kilometers for the ENTIRE route including the return journey home.
+
+My complete route:
+$routeDescription
+
+Estimate the total driving distance for the entire route using realistic highway/motorway routes. If any leg requires a ferry crossing, do NOT count the ferry distance as driving distance — only count the actual road driving distance.
+
+You MUST respond with ONLY a single JSON object. No text before or after. No markdown formatting.
+The object must have exactly these fields:
+- "totalDistanceKm": total driving distance in kilometers (number, rounded to nearest integer)
+- "legs": array of objects, each with "from" (string), "to" (string), "distanceKm" (number)
+
+Example: {"totalDistanceKm":1250,"legs":[{"from":"Budapest","to":"Vienna","distanceKm":243},{"from":"Vienna","to":"Budapest","distanceKm":243}]}"""
+
+        try {
+            val messagesJson = gson.toJson(listOf(
+                mapOf("role" to "user", "content" to prompt)
+            ))
+            val bodyJson = """{"model":"$model","messages":$messagesJson,"temperature":0.2,"max_tokens":1000}"""
+
+            Log.d(TAG, "Estimating driving distance...")
+            Log.d(TAG, "Route: $routeDescription")
+
+            val request = Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .addHeader("Authorization", "Bearer $openAiApiKey")
+                .addHeader("Content-Type", "application/json")
+                .post(bodyJson.toRequestBody(JSON_MEDIA))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (!response.isSuccessful) {
+                Log.e(TAG, "API error ${response.code}: $responseBody")
+                return@withContext null
+            }
+
+            val json = JsonParser.parseString(responseBody).asJsonObject
+            val choices = json.getAsJsonArray("choices")
+            if (choices == null || choices.size() == 0) {
+                Log.e(TAG, "No choices in response")
+                return@withContext null
+            }
+
+            val content = choices[0].asJsonObject
+                .getAsJsonObject("message")
+                .get("content").asString.trim()
+
+            Log.d(TAG, "Distance GPT response: $content")
+
+            // Parse JSON object
+            val cleaned = content
+                .replace("```json", "")
+                .replace("```", "")
+                .trim()
+
+            val resultJson = try {
+                JsonParser.parseString(cleaned).asJsonObject
+            } catch (_: Exception) {
+                // Try extracting { ... }
+                val start = content.indexOf('{')
+                val end = content.lastIndexOf('}')
+                if (start >= 0 && end > start) {
+                    try {
+                        JsonParser.parseString(content.substring(start, end + 1)).asJsonObject
+                    } catch (_: Exception) { null }
+                } else null
+            }
+
+            resultJson?.get("totalDistanceKm")?.asDouble
+        } catch (e: Exception) {
+            Log.e(TAG, "Distance estimation exception: ${e.message}", e)
+            null
         }
     }
 

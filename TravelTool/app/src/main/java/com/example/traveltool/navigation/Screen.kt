@@ -16,4 +16,5 @@ sealed class Screen(val route: String) {
     data object CurrencySettings   : Screen("currency_settings")
     data object Spendings          : Screen("spendings")
     data object ApiKey             : Screen("api_key")
+    data object DayDetail          : Screen("day_detail")
 }

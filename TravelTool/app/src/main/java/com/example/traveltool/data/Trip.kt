@@ -95,7 +95,8 @@ data class Trip(
     val additionalFees: List<AdditionalFee> = emptyList(),
     val dailySpendings: List<DailySpending> = emptyList(),
     val otherSpendings: List<OtherSpending> = emptyList(),
-    val displayCurrency: String = "EUR"
+    val displayCurrency: String = "EUR",
+    val estimatedDrivingDistanceKm: Double? = null
 ) {
     /** True when accommodations list is empty or any accommodation has a warning. */
     val hasWarning: Boolean

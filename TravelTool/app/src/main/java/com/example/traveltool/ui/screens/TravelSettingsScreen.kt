@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -27,7 +28,7 @@ import com.example.traveltool.ui.theme.*
 import kotlinx.coroutines.launch
 
 /**
- * Travel settings: car/plane mode, fuel, tolls, plane tickets, additional fees.
+ * Travel specifics: car/plane mode, fuel, tolls, plane tickets, additional fees, daily activities.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +36,7 @@ fun TravelSettingsScreen(
     tripId: String,
     tripViewModel: TripViewModel,
     onApiKeySettings: () -> Unit,
+    onDayClick: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val trip = tripViewModel.getTripById(tripId)
@@ -69,11 +71,25 @@ fun TravelSettingsScreen(
     var feeToDelete by remember { mutableStateOf<AdditionalFee?>(null) }
 
     var showMissingKeyDialog by remember { mutableStateOf(false) }
+    var isEstimatingFuel by remember { mutableStateOf(false) }
+
+    // Daily activities: generate list of days
+    val oneDayMs = 24 * 60 * 60 * 1000L
+    val tripDays = remember(trip.startMillis, trip.endMillis) {
+        val days = mutableListOf<Long>()
+        var d = trip.startMillis
+        while (d < trip.endMillis) {
+            days.add(d)
+            d += oneDayMs
+        }
+        days
+    }
+    val hasAnyAccommodation = trip.accommodations.isNotEmpty()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Travel Settings") },
+                title = { Text("Travel Specifics") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -152,7 +168,86 @@ fun TravelSettingsScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
-                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Toll Roads & Vignettes") }
+                // ── Fuel Cost Estimation ────────────────────────
+                item {
+                    val canEstimate = trip.fuelConsumption != null && trip.fuelConsumption > 0 &&
+                            trip.fuelPricePerLiter != null && trip.fuelPricePerLiter > 0
+
+                    Button(
+                        onClick = {
+                            val apiKey = ApiKeyStore.getOpenAiKey(context)
+                            if (apiKey.isBlank()) {
+                                showMissingKeyDialog = true
+                                return@Button
+                            }
+                            val model = ApiKeyStore.getOpenAiModel(context)
+                            if (trip.startingPoint.isBlank()) { Toast.makeText(context, "Set a starting point first", Toast.LENGTH_SHORT).show(); return@Button }
+                            if (trip.accommodations.isEmpty()) { Toast.makeText(context, "Add accommodations first", Toast.LENGTH_SHORT).show(); return@Button }
+                            isEstimatingFuel = true
+                            scope.launch {
+                                val distanceKm = DirectionsApiHelper.estimateDrivingDistance(
+                                    startingPoint = trip.startingPoint,
+                                    accommodations = trip.accommodations,
+                                    openAiApiKey = apiKey,
+                                    travelMode = trip.travelMode,
+                                    model = model
+                                )
+                                if (distanceKm != null) {
+                                    tripViewModel.updateTrip(trip.copy(estimatedDrivingDistanceKm = distanceKm))
+                                    Toast.makeText(context, "Estimated distance: ${distanceKm.toInt()} km", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Could not estimate distance — check API key", Toast.LENGTH_LONG).show()
+                                }
+                                isEstimatingFuel = false
+                            }
+                        },
+                        enabled = canEstimate && !isEstimatingFuel,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DraculaCyan, contentColor = DraculaBackground),
+                    ) {
+                        if (isEstimatingFuel) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DraculaBackground)
+                        } else {
+                            Icon(Icons.Default.Search, null, Modifier.size(18.dp))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (isEstimatingFuel) "Estimating…" else "Estimate Fuel Cost")
+                    }
+
+                    // Show result if we have an estimated distance
+                    if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
+                        val distKm = trip.estimatedDrivingDistanceKm
+                        val litres = (distKm / 100.0) * trip.fuelConsumption
+                        val cost = litres * trip.fuelPricePerLiter
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = DraculaGreen.copy(alpha = 0.12f)),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Estimated Fuel Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = DraculaGreen)
+                                Spacer(Modifier.height(6.dp))
+                                Text("🛣️ Distance: ${distKm.toInt()} km", fontSize = 14.sp, color = DraculaForeground)
+                                Text("⛽ Fuel needed: %.1f L".format(litres), fontSize = 14.sp, color = DraculaForeground)
+                                Text(
+                                    "💰 Cost: %.2f %s".format(cost, trip.fuelPriceCurrency),
+                                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DraculaGreen,
+                                )
+                            }
+                        }
+                    } else if (!canEstimate) {
+                        Text(
+                            "Enter fuel consumption and price to estimate fuel cost",
+                            fontSize = 12.sp, color = DraculaComment,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Toll Roads, Vignettes & Ferries") }
 
                 if (trip.tollRoads.isEmpty()) {
                     item { Text("No toll roads added.", fontSize = 14.sp, color = DraculaComment, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) }
@@ -237,6 +332,104 @@ fun TravelSettingsScreen(
                     Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Add Fee")
                 }
                 Spacer(Modifier.height(12.dp))
+            }
+
+            // ══════════════ DAILY ACTIVITIES ══════════════
+            item { HorizontalDivider(color = DraculaCurrent); SectionHeader("Daily Activities") }
+
+            if (!hasAnyAccommodation) {
+                item {
+                    Text(
+                        "Add accommodations to unlock daily activity planning.",
+                        fontSize = 14.sp, color = DraculaComment,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
+            } else {
+                items(tripDays.size) { index ->
+                    val dayMillis = tripDays[index]
+                    val dayNumber = index + 1
+                    val dayDateFormat = java.text.SimpleDateFormat("EEE, MMM d", java.util.Locale.getDefault())
+                    val dayLabel = dayDateFormat.format(java.util.Date(dayMillis))
+
+                    // Check if this day has accommodation coverage
+                    val coveringAccom = trip.accommodations.find { accom ->
+                        accom.startMillis <= dayMillis && dayMillis < accom.endMillis
+                    } ?: trip.accommodations.find { accom ->
+                        accom.startMillis <= dayMillis && dayMillis <= accom.endMillis
+                    }
+                    val hasCoverage = coveringAccom != null && coveringAccom.location.isNotBlank()
+
+                    // Determine moving/staying
+                    val prevDayAccom = if (index > 0) {
+                        val prevMillis = tripDays[index - 1]
+                        trip.accommodations.find { it.startMillis <= prevMillis && prevMillis < it.endMillis }
+                            ?: trip.accommodations.find { it.startMillis <= prevMillis && prevMillis <= it.endMillis }
+                    } else null
+
+                    val isMoving = when {
+                        index == 0 -> true  // first day — traveling from home
+                        coveringAccom == null || prevDayAccom == null -> false
+                        coveringAccom.location != prevDayAccom.location -> true
+                        else -> false
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 3.dp)
+                            .then(
+                                if (hasCoverage) Modifier.clickable { onDayClick(dayMillis) }
+                                else Modifier
+                            ),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (hasCoverage) DraculaCurrent else DraculaCurrent.copy(alpha = 0.4f)
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (isMoving) "🚗" else "🏨",
+                                fontSize = 20.sp,
+                                modifier = Modifier.width(32.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = "Day $dayNumber — $dayLabel",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (hasCoverage) DraculaForeground else DraculaComment,
+                                )
+                                if (coveringAccom != null && coveringAccom.location.isNotBlank()) {
+                                    Text(
+                                        text = coveringAccom.location,
+                                        fontSize = 12.sp,
+                                        color = DraculaComment,
+                                    )
+                                } else {
+                                    Text(
+                                        "No accommodation — tap to add",
+                                        fontSize = 12.sp,
+                                        color = DraculaYellow.copy(alpha = 0.7f),
+                                    )
+                                }
+                            }
+                            if (hasCoverage) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = DraculaComment,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             item {

@@ -177,8 +177,9 @@ fun TravelToolNavHost(navController: NavHostController) {
                 tripViewModel = tripViewModel,
                 onApiKeySettings = {
                     navController.navigate(Screen.ApiKey.route)
-                },
-                onBack = { navController.popBackStack() }
+                },                onDayClick = { dayMillis ->
+                    navController.navigate("${Screen.DayDetail.route}/$tripId/$dayMillis")
+                },                onBack = { navController.popBackStack() }
             )
         }
 
@@ -205,6 +206,18 @@ fun TravelToolNavHost(navController: NavHostController) {
         // ── API Key Settings ───────────────────────────────────
         composable(Screen.ApiKey.route) {
             SettingsScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Day Detail ─────────────────────────────────────────
+        composable("${Screen.DayDetail.route}/{tripId}/{dayMillis}") { backStackEntry ->
+            val tripId   = backStackEntry.arguments?.getString("tripId") ?: ""
+            val dayMillis = backStackEntry.arguments?.getString("dayMillis")?.toLongOrNull() ?: 0L
+            DayDetailScreen(
+                tripId = tripId,
+                dayMillis = dayMillis,
+                tripViewModel = tripViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
