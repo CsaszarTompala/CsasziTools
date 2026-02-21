@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.traveltool.data.*
 import com.example.traveltool.ui.components.CurrencyPicker
 import com.example.traveltool.ui.theme.*
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Manage daily and other spendings for a trip.
@@ -238,6 +239,8 @@ private fun SpendingCard(
     onDelete: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    val context = LocalContext.current
+    val eurRates = remember { CurrencyManager.loadCachedRates(context) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -252,7 +255,7 @@ private fun SpendingCard(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.foreground)
-                Text("💰 $amount $currency ($amountLabel)", fontSize = 13.sp, color = colors.green)
+                Text("💰 ${CurrencyManager.formatAmount(amount, currency, eurRates)} $currency ($amountLabel)", fontSize = 13.sp, color = colors.green)
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Close, "Delete", tint = colors.red, modifier = Modifier.size(18.dp))

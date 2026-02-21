@@ -106,6 +106,7 @@ data class DayPlan(
     val dayMillis: Long = 0L,
     val departureHour: Int = 9,
     val departureMinute: Int = 0,
+    val movingDayDrivingDistanceKm: Double? = null,
 )
 
 /**
@@ -162,6 +163,10 @@ data class Activity(
     val category: String = "",
     val eatingType: String = "",
     val travelDayPosition: String = "",
+    val isDelay: Boolean = false,
+    val cost: Double = 0.0,
+    val costCurrency: String = "EUR",
+    val costMultiplier: Int = 1,
 )
 
 /**

@@ -121,6 +121,25 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Add an activity at a specific position (after the given orderIndex).
+     * Shifts subsequent activities' orderIndex as needed.
+     */
+    fun addActivityAtPosition(tripId: String, activity: Activity, afterOrderIndex: Int?) {
+        val trip = getTripById(tripId) ?: return
+        val dayStart = activity.dayMillis - (activity.dayMillis % ONE_DAY_MS)
+        val newOrderIndex = if (afterOrderIndex != null) afterOrderIndex + 1 else 0
+        // Shift activities on the same day with orderIndex >= newOrderIndex
+        val shifted = trip.activities.map { a ->
+            val aDayStart = a.dayMillis - (a.dayMillis % ONE_DAY_MS)
+            if (aDayStart == dayStart && a.orderIndex >= newOrderIndex) {
+                a.copy(orderIndex = a.orderIndex + 1)
+            } else a
+        }
+        val withNew = shifted + activity.copy(orderIndex = newOrderIndex)
+        updateTrip(trip.copy(activities = withNew))
+    }
+
+    /**
      * Update an existing activity.
      */
     fun updateActivity(tripId: String, updated: Activity) {

@@ -153,6 +153,19 @@ fun TravelToolNavHost(navController: NavHostController) {
                 onApiKeySettings = {
                     navController.navigate(Screen.ApiKey.route)
                 },
+                onFuelBreakdown = { id ->
+                    navController.navigate("${Screen.FuelBreakdown.route}/$id")
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Fuel Breakdown ─────────────────────────────────────────
+        composable("${Screen.FuelBreakdown.route}/{tripId}") { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString("tripId") ?: ""
+            FuelBreakdownScreen(
+                tripId = tripId,
+                tripViewModel = tripViewModel,
                 onBack = { navController.popBackStack() }
             )
         }

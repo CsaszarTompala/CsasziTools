@@ -20,4 +20,5 @@ sealed class Screen(val route: String) {
     data object AddActivity        : Screen("add_activity")
     data object EditActivity       : Screen("edit_activity")
     data object RecommendActivity  : Screen("recommend_activity")
+    data object FuelBreakdown      : Screen("fuel_breakdown")
 }

@@ -207,4 +207,18 @@ object CurrencyManager {
         val inEur = amount / fromRate
         return inEur * toRate
     }
+
+    /**
+     * Format a monetary amount for display.
+     * Currencies whose EUR rate is >= 100 (e.g. HUF, JPY) are shown as whole
+     * integers; other currencies are shown with 2 decimal places.
+     */
+    fun formatAmount(amount: Double, currency: String, rates: Map<String, Double>): String {
+        val eurRate = rates[currency] ?: 1.0
+        return if (eurRate >= 100.0) {
+            "%.0f".format(amount)
+        } else {
+            "%.2f".format(amount)
+        }
+    }
 }

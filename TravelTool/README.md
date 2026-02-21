@@ -14,14 +14,16 @@
 ## Features
 
 - **Trip creation wizard** — name → date range picker (2 steps; location is set later from the trip hub).
-- **Trip detail hub** — total cost summary, tap-to-edit name/location/dates, start point, end point, accommodations, spendings.
-- **Accommodation management** — manual one-by-one adding, date-conflict detection (boundary dates shareable), per-night pricing, trip-range calendar highlighting.
+- **Trip detail hub** — total cost summary, tap-to-edit name/dates, start point, end point, accommodations, spendings.
+- **Accommodation management** — manual one-by-one adding, date-conflict detection (boundary dates shareable), per-night pricing, trip-range calendar highlighting. Location is entered first; the name auto-fills to "Staying at &lt;location&gt;" — tapping the name field clears it for custom input, leaving it empty restores the auto-generated name.
 - **Travel Mode** — car / microbus / plane mode, fuel, tolls, plane tickets (with airport autocomplete search & ticket quantity), car rentals (plane mode), public transport fees, additional fees.
 - **Airport autocomplete** — built-in database of ~140 major world airports, searchable by city, name, or IATA code.
 - **AI-powered toll finder** — uses OpenAI GPT to find vignettes, per-use tolls, and ferry crossings for the full route (including the return home).
 - **Start / End point** — separate start and end points for the trip (both default to current location). The first day's drive goes from the start point to the accommodation; the last day's drive goes from accommodation to the end point.
-- **AI fuel cost estimation** — estimates total driving distance via GPT and calculates fuel cost from consumption + price. Activity-related drives (to each activity and the return to accommodation) are included in the total distance.
-- **Daily Activities** — standalone per-day trip view (including travel-home day) with sunrise/sunset times (via sunrise-sunset.org API), moving/staying day detection, inline scroll-wheel departure time picker (hour & minute) with explicit "Set" button, and sequentially chained activities with Google Routes API driving times (GPT fallback). The return drive from the last activity back to the accommodation is automatically estimated and shown in the timeline. On travel days (first & last), activities are split into "before arrival" (on the way) and "after arrival" groups so detour stops can be planned along the route.
+- **Fuel cost estimation** — calculates fuel cost from total driving distance (summed automatically from activity drives and moving-day auto-drives via Google Routes API), fuel consumption, and fuel price per litre. The "Estimated Fuel Cost" card in Travel Mode is clickable and opens a chronological fuel breakdown page that lists each drive segment (from → to), distance, estimated fuel used, and segment cost.
+- **Daily Activities** — standalone per-day trip view (including travel-home day) with sunrise/sunset times (via sunrise-sunset.org API), moving/staying day detection, inline scroll-wheel departure time picker (hour & minute) with explicit "Set" button, and sequentially chained activities with Google Routes API driving times (GPT fallback). The return drive from the last activity back to the accommodation is automatically estimated and shown in the timeline. On travel days (first & last), activities are split into "before arrival" (on the way) and "after arrival" groups so detour stops can be planned along the route. Moving days always show a visual "Drive" card from origin to destination with real-time driving time and distance estimation from Google Routes API — departure time is taken from the clock dial and the estimated arrival time is computed and displayed. The auto-drive card is replaced when on-the-road activities are added. Activity location is entered first; the name auto-fills to "Activity at &lt;location&gt;" — tapping the name field clears it for custom input, leaving it empty restores the auto-generated name. An "After activity" dropdown lets the user insert new activities at any position in the day's sequence — defaults to the last activity (append), but selecting "Departure" or any earlier activity inserts in between and automatically re-indexes the chain and recalculates driving times for neighbours. Each activity has an optional cost field (default 0) with a ×multiplier (1–30) dropdown and currency picker; activity costs are included in the total trip cost.
+- **Delay activities** — when adding an activity, a "Delay" checkbox creates a wait/pause at the current location with no driving. Only the name and duration can be set; the location is inherited from the previous activity.
+- **Smart currency formatting** — currencies worth less than 1/100 of a EUR (e.g. HUF, JPY) are displayed as whole integers; other currencies show two decimal places.
 - **Activity categories** — Hiking, Museum, Nice sight, Beach, Wellness, Eating (Breakfast/Brunch/Lunch/Dinner) — selectable in the recommendation screen.
 - **Place recommendations** — Google Places API Text Search suggests nearby places by category with photos, ratings, and descriptions. On staying days results are centred on the day's accommodation; on travel days the user can search near departure, destination, or along the way. Each result shows its distance from the relevant accommodation(s).
 - **Edit Activity** — tap any activity to modify name, location, duration, or delete it.
@@ -63,6 +65,7 @@ TravelTool/
 │       │   ├── AddAccommodationScreen.kt
 │       │   ├── EditAccommodationScreen.kt
 │       │   ├── TravelSettingsScreen.kt  # Travel Mode (plane tickets, car rental, public transport)
+│       │   ├── FuelBreakdownScreen.kt # Chronological per-drive fuel breakdown
 │       │   ├── DailyActivitiesScreen.kt # Daily Activities (standalone)
 │   │   ├── DayDetailScreen.kt   # Day detail + sequential activity timeline
 │       │   ├── AddActivityScreen.kt # Add planned activity (category via recommendations)
@@ -85,7 +88,7 @@ TravelTool/
 
 | API | Purpose | Key required |
 |---|---|---|
-| OpenAI GPT | Toll/vignette/ferry finder, driving distance estimation | Yes (user-provided) |
+| OpenAI GPT | Toll/vignette/ferry finder | Yes (user-provided) |
 | Frankfurter | Live currency exchange rates | No |
 | sunrise-sunset.org | Sunrise/sunset times for daily activities | No |
 | Google Maps SDK | Map display, location picking, geocoding | Yes (in AndroidManifest.xml) |

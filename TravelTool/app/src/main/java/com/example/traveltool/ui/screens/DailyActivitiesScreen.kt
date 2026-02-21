@@ -136,7 +136,7 @@ fun DailyActivitiesScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = if (isFinalDay) "🏠" else if (isMoving) "🚗" else "🏨",
+                                text = if (isFinalDay) "🚗" else if (isMoving) "🚗" else "\uD83C\uDFE0",
                                 fontSize = 20.sp,
                                 modifier = Modifier.width(32.dp),
                             )

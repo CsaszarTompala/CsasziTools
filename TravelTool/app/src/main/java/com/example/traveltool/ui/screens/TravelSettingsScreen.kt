@@ -35,6 +35,7 @@ fun TravelSettingsScreen(
     tripId: String,
     tripViewModel: TripViewModel,
     onApiKeySettings: () -> Unit,
+    onFuelBreakdown: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val colors = LocalAppColors.current
@@ -48,6 +49,7 @@ fun TravelSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currencies = remember { mutableStateOf(CurrencyManager.getCurrencyList(context)) }
+    val eurRates = remember(trip) { CurrencyManager.loadCachedRates(context) }
 
     LaunchedEffect(Unit) {
         currencies.value = CurrencyManager.getCurrencyList(context)
@@ -78,7 +80,6 @@ fun TravelSettingsScreen(
     var feeToDelete by remember { mutableStateOf<AdditionalFee?>(null) }
 
     var showMissingKeyDialog by remember { mutableStateOf(false) }
-    var isEstimatingFuel by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -162,82 +163,64 @@ fun TravelSettingsScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
-                // ── Fuel Cost Estimation ────────────────────────
+                // ── Fuel Cost Summary ────────────────────────
                 item {
                     val canEstimate = trip.fuelConsumption != null && trip.fuelConsumption > 0 &&
                             trip.fuelPricePerLiter != null && trip.fuelPricePerLiter > 0
 
-                    Button(
-                        onClick = {
-                            val apiKey = ApiKeyStore.getOpenAiKey(context)
-                            if (apiKey.isBlank()) {
-                                showMissingKeyDialog = true
-                                return@Button
+                    // Calculate total distance from all activity drives + moving-day auto-drives
+                    if (canEstimate) {
+                        var totalKm = 0.0
+                        trip.activities.forEach { act ->
+                            totalKm += act.drivingDistanceToKm ?: 0.0
+                            totalKm += act.returnDrivingDistanceKm ?: 0.0
+                        }
+                        trip.dayPlans.forEach { plan ->
+                            val dayHasBeforeArrival = trip.activities.any { act ->
+                                act.dayMillis == plan.dayMillis &&
+                                    act.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
                             }
-                            val model = ApiKeyStore.getOpenAiModel(context)
-                            if (trip.startingPoint.isBlank()) { Toast.makeText(context, "Set a starting point first", Toast.LENGTH_SHORT).show(); return@Button }
-                            if (trip.accommodations.isEmpty()) { Toast.makeText(context, "Add accommodations first", Toast.LENGTH_SHORT).show(); return@Button }
-                            isEstimatingFuel = true
-                            scope.launch {
-                                val distanceKm = DirectionsApiHelper.estimateDrivingDistance(
-                                    startingPoint = trip.startingPoint,
-                                    endingPoint = trip.endingPoint,
-                                    accommodations = trip.accommodations,
-                                    openAiApiKey = apiKey,
-                                    travelMode = trip.travelMode,
-                                    model = model
-                                )
-                                if (distanceKm != null) {
-                                    tripViewModel.updateTrip(trip.copy(estimatedDrivingDistanceKm = distanceKm))
-                                    Toast.makeText(context, "Estimated distance: ${distanceKm.toInt()} km", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Could not estimate distance — check API key", Toast.LENGTH_LONG).show()
+                            if (!dayHasBeforeArrival && plan.movingDayDrivingDistanceKm != null) {
+                                totalKm += plan.movingDayDrivingDistanceKm
+                            }
+                        }
+
+                        if (totalKm > 0) {
+                            val litres = (totalKm / 100.0) * trip.fuelConsumption!!
+                            val cost = litres * trip.fuelPricePerLiter!!
+
+                            Card(
+                                onClick = { onFuelBreakdown(tripId) },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = colors.green.copy(alpha = 0.12f)),
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text("Estimated Fuel Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.green)
+                                        Text("Tap for details \u25B6", fontSize = 11.sp, color = colors.comment)
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("\uD83D\uDEE3\uFE0F Total distance: ${totalKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
+                                    Text("\u26FD Fuel needed: %.1f L".format(litres), fontSize = 14.sp, color = colors.foreground)
+                                    Text(
+                                        "\uD83D\uDCB0 Cost: ${CurrencyManager.formatAmount(cost, trip.fuelPriceCurrency, eurRates)} ${trip.fuelPriceCurrency}",
+                                        fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.green,
+                                    )
                                 }
-                                isEstimatingFuel = false
                             }
-                        },
-                        enabled = canEstimate && !isEstimatingFuel,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.background),
-                    ) {
-                        if (isEstimatingFuel) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.background)
                         } else {
-                            Icon(Icons.Default.Search, null, Modifier.size(18.dp))
+                            Text(
+                                "Add activities to your days to see the estimated fuel cost (distances are calculated from activity drives)",
+                                fontSize = 12.sp, color = colors.comment,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                            )
                         }
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (isEstimatingFuel) "Estimating…" else "Estimate Fuel Cost")
-                    }
-
-                    // Show result if we have an estimated distance
-                    if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
-                        val routeKm = trip.estimatedDrivingDistanceKm
-                        val activityKm = trip.activities.sumOf { (it.drivingDistanceToKm ?: 0.0) + (it.returnDrivingDistanceKm ?: 0.0) }
-                        val totalKm = routeKm + activityKm
-                        val litres = (totalKm / 100.0) * trip.fuelConsumption
-                        val cost = litres * trip.fuelPricePerLiter
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = colors.green.copy(alpha = 0.12f)),
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Estimated Fuel Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.green)
-                                Spacer(Modifier.height(6.dp))
-                                Text("\uD83D\uDEE3\uFE0F Route distance: ${routeKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
-                                if (activityKm > 0) {
-                                    Text("\uD83D\uDCCD Activity drives: ${activityKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
-                                }
-                                Text("\uD83D\uDEE3\uFE0F Total distance: ${totalKm.toInt()} km", fontSize = 14.sp, color = colors.foreground)
-                                Text("\u26FD Fuel needed: %.1f L".format(litres), fontSize = 14.sp, color = colors.foreground)
-                                Text(
-                                    "\uD83D\uDCB0 Cost: %.2f %s".format(cost, trip.fuelPriceCurrency),
-                                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.green,
-                                )
-                            }
-                        }
-                    } else if (!canEstimate) {
+                    } else {
                         Text(
                             "Enter fuel consumption and price to estimate fuel cost",
                             fontSize = 12.sp, color = colors.comment,
@@ -505,6 +488,8 @@ private fun themedTextFieldColors(): TextFieldColors {
 @Composable
 private fun PriceItemCard(name: String, price: Double, currency: String, badge: String? = null, onClick: () -> Unit, onDelete: () -> Unit) {
     val colors = LocalAppColors.current
+    val context = LocalContext.current
+    val eurRates = remember { CurrencyManager.loadCachedRates(context) }
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp).clickable { onClick() },
         shape = RoundedCornerShape(10.dp), colors = CardDefaults.cardColors(containerColor = colors.current),
@@ -515,7 +500,7 @@ private fun PriceItemCard(name: String, price: Double, currency: String, badge: 
                     Text(name.ifBlank { "(No name)" }, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.foreground)
                     if (badge != null) { Spacer(Modifier.width(6.dp)); Text(badge, fontSize = 10.sp, color = colors.accent) }
                 }
-                Text(if (price > 0) "💰 $price $currency" else "Price not set", fontSize = 13.sp,
+                Text(if (price > 0) "💰 ${CurrencyManager.formatAmount(price, currency, eurRates)} $currency" else "Price not set", fontSize = 13.sp,
                     color = if (price > 0) colors.green else colors.comment)
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {

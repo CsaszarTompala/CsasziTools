@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.traveltool.data.CurrencyManager
+import com.example.traveltool.data.TravelDayPosition
 import com.example.traveltool.data.Trip
 import com.example.traveltool.data.TripViewModel
 import com.example.traveltool.ui.theme.*
@@ -76,14 +77,31 @@ private fun calculateTotalTripCost(trip: Trip, eurRates: Map<String, Double>, tr
         total += CurrencyManager.convert(spending.amount, spending.currency, trip.displayCurrency, eurRates)
     }
 
-    // Fuel cost (if estimated distance + consumption + price are all available)
-    if (trip.estimatedDrivingDistanceKm != null && trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
-        // Main trip route distance
-        var totalKm = trip.estimatedDrivingDistanceKm!!
-        // Add activity-related driving distances (to each activity + return from last)
+    // Activity costs
+    trip.activities.forEach { act ->
+        if (act.cost > 0) {
+            val actCost = act.cost * act.costMultiplier
+            total += CurrencyManager.convert(actCost, act.costCurrency, trip.displayCurrency, eurRates)
+        }
+    }
+
+    // Fuel cost (if consumption + price are available)
+    if (trip.fuelConsumption != null && trip.fuelPricePerLiter != null) {
+        // Activity-related driving distances (to each activity + return)
+        var totalKm = 0.0
         trip.activities.forEach { act ->
             totalKm += act.drivingDistanceToKm ?: 0.0
             totalKm += act.returnDrivingDistanceKm ?: 0.0
+        }
+        // Moving-day base drives (from DayPlans, for days with no before-arrival activities)
+        trip.dayPlans.forEach { plan ->
+            val dayHasBeforeArrival = trip.activities.any { act ->
+                act.dayMillis == plan.dayMillis &&
+                    act.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+            }
+            if (!dayHasBeforeArrival && plan.movingDayDrivingDistanceKm != null) {
+                totalKm += plan.movingDayDrivingDistanceKm
+            }
         }
         val litres = (totalKm / 100.0) * trip.fuelConsumption
         val fuelCost = litres * trip.fuelPricePerLiter
@@ -121,8 +139,6 @@ fun TripDetailScreen(
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf(trip.name) }
-
-    var newLocation by remember { mutableStateOf(trip.location) }
 
     var showDatesDialog by remember { mutableStateOf(false) }
 
@@ -209,7 +225,6 @@ fun TripDetailScreen(
             Column(
                 modifier = Modifier
                     .clickable {
-                        newLocation = trip.location
                         showDatesDialog = true
                     }
                     .padding(horizontal = 24.dp, vertical = 16.dp)
@@ -243,7 +258,7 @@ fun TripDetailScreen(
                     Text("Total Trip Cost", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.primary)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "💰 %.2f %s".format(totalCost, trip.displayCurrency),
+                        text = "💰 ${CurrencyManager.formatAmount(totalCost, trip.displayCurrency, eurRates)} ${trip.displayCurrency}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.green,
@@ -290,11 +305,28 @@ fun TripDetailScreen(
             HorizontalDivider(color = colors.current)
 
             // --- Travel Mode ---
+            val activityTotalKm = run {
+                var km = 0.0
+                trip.activities.forEach { act ->
+                    km += act.drivingDistanceToKm ?: 0.0
+                    km += act.returnDrivingDistanceKm ?: 0.0
+                }
+                trip.dayPlans.forEach { plan ->
+                    val dayHasBeforeArrival = trip.activities.any { act ->
+                        act.dayMillis == plan.dayMillis &&
+                            act.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                    }
+                    if (!dayHasBeforeArrival && plan.movingDayDrivingDistanceKm != null) {
+                        km += plan.movingDayDrivingDistanceKm
+                    }
+                }
+                km
+            }
             SettingsRow(
                 title = "Travel Mode",
                 subtitle = when (trip.travelMode) {
-                    com.example.traveltool.data.TravelMode.CAR -> "Car" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
-                    com.example.traveltool.data.TravelMode.MICROBUS -> "Microbus" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (trip.estimatedDrivingDistanceKm != null) " • ${trip.estimatedDrivingDistanceKm.toInt()} km" else ""
+                    com.example.traveltool.data.TravelMode.CAR -> "Car" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (activityTotalKm > 0) " • ${activityTotalKm.toInt()} km" else ""
+                    com.example.traveltool.data.TravelMode.MICROBUS -> "Microbus" + if (trip.fuelConsumption != null) " • ${trip.fuelConsumption} L/100km" else "" + if (activityTotalKm > 0) " • ${activityTotalKm.toInt()} km" else ""
                     com.example.traveltool.data.TravelMode.PLANE -> "Plane"
                 },
                 onClick = { onTravelSettings(tripId) }
@@ -391,22 +423,9 @@ fun TripDetailScreen(
 
         AlertDialog(
             onDismissRequest = { showDatesDialog = false },
-            title = { Text("Edit Location & Dates") },
+            title = { Text("Edit Dates") },
             text = {
                 Column {
-                    OutlinedTextField(
-                        value = newLocation,
-                        onValueChange = { newLocation = it },
-                        label = { Text("Location") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = colors.primary,
-                            focusedLabelColor = colors.primary,
-                            cursorColor = colors.primary,
-                        )
-                    )
-                    Spacer(Modifier.height(16.dp))
                     Text("Start Date", fontSize = 13.sp, color = colors.comment)
                     Spacer(Modifier.height(4.dp))
                     OutlinedButton(
@@ -429,10 +448,9 @@ fun TripDetailScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (newLocation.isNotBlank() && editEndMillis >= editStartMillis) {
+                        if (editEndMillis >= editStartMillis) {
                             tripViewModel.updateTrip(
                                 trip.copy(
-                                    location = newLocation.trim(),
                                     startMillis = editStartMillis,
                                     endMillis = editEndMillis
                                 )

@@ -13,10 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.traveltool.data.Accommodation
+import com.example.traveltool.data.CurrencyManager
 import com.example.traveltool.data.TripViewModel
 import com.example.traveltool.ui.theme.*
 import java.text.SimpleDateFormat
@@ -166,6 +168,8 @@ private fun AccommodationCard(
     onDelete: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    val context = LocalContext.current
+    val eurRates = remember { CurrencyManager.loadCachedRates(context) }
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
     val startDate = remember(accom.startMillis) {
         if (accom.startMillis > 0) dateFormat.format(Date(accom.startMillis)) else "—"
@@ -205,7 +209,7 @@ private fun AccommodationCard(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = if (accom.pricePerNight != null)
-                        "💰 ${accom.pricePerNight} ${accom.priceCurrency}/night"
+                        "💰 ${CurrencyManager.formatAmount(accom.pricePerNight, accom.priceCurrency, eurRates)} ${accom.priceCurrency}/night"
                     else
                         "💰 Price not set",
                     fontSize = 14.sp,

@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.traveltool.data.Accommodation
 import com.example.traveltool.data.Activity
+import com.example.traveltool.data.ApiKeyStore
+import com.example.traveltool.data.CurrencyManager
+import com.example.traveltool.data.DirectionsApiHelper
+import com.example.traveltool.data.DrivingEstimate
 import com.example.traveltool.data.TravelDayPosition
 import com.example.traveltool.data.SunriseSunsetApi
 import com.example.traveltool.data.TripViewModel
@@ -100,6 +104,8 @@ fun DayDetailScreen(
 
     // Determine the location label for today
     val locationLabel = todayAccom?.location?.ifBlank { trip.location } ?: trip.location
+
+    val eurRates = remember(trip) { CurrencyManager.loadCachedRates(context) }
 
     // Sunrise / sunset state
     var sunTimes by remember { mutableStateOf<SunriseSunsetApi.SunTimes?>(null) }
@@ -269,7 +275,7 @@ fun DayDetailScreen(
                         }
                         if (todayAccom.pricePerNight != null && todayAccom.pricePerNight > 0) {
                             Text(
-                                "💰 ${todayAccom.pricePerNight} ${todayAccom.priceCurrency} / night",
+                                "💰 ${CurrencyManager.formatAmount(todayAccom.pricePerNight, todayAccom.priceCurrency, eurRates)} ${todayAccom.priceCurrency} / night",
                                 fontSize = 13.sp,
                                 color = colors.green,
                             )
@@ -512,146 +518,242 @@ fun DayDetailScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            if (dayActivities.isEmpty()) {
+            if (!isMovingDay && dayActivities.isEmpty()) {
                 Text(
                     text = "No activities planned for this day",
                     fontSize = 13.sp,
                     color = colors.comment,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
-            } else {
+            } else if (isMovingDay) {
                 var cumulativeMinutes = departureHour * 60 + departureMinute
 
-                if (isMovingDay) {
-                    // ── Travel Day Timeline ──
-                    val beforeActivities = dayActivities.filter {
-                        it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
-                    }.sortedBy { it.orderIndex }
-                    val afterActivities = dayActivities.filter {
-                        it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
-                    }.sortedBy { it.orderIndex }
+                // ── Travel Day Timeline ──
+                val beforeActivities = dayActivities.filter {
+                    it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                }.sortedBy { it.orderIndex }
+                val afterActivities = dayActivities.filter {
+                    it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
+                }.sortedBy { it.orderIndex }
 
-                    val originLabel = when {
-                        dayMillis == trip.startMillis -> trip.startingPoint.ifBlank { "Home" }
-                        prevDayAccom != null -> prevDayAccom.name.ifBlank { prevDayAccom.location }
-                        todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
-                        else -> trip.startingPoint.ifBlank { "Home" }
-                    }
-                    val destLabel = when {
-                        isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "Home" } }
-                        todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
-                        else -> "Accommodation"
-                    }
-                    val arrivalEmoji = "🏠"
+                val originLabel = when {
+                    dayMillis == trip.startMillis -> trip.startingPoint.ifBlank { "Home" }
+                    prevDayAccom != null -> prevDayAccom.name.ifBlank { prevDayAccom.location }
+                    todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
+                    else -> trip.startingPoint.ifBlank { "Home" }
+                }
+                val destLabel = when {
+                    isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "Home" } }
+                    todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
+                    else -> "Accommodation"
+                }
+                val arrivalEmoji = "🏠"
 
-                    // --- BEFORE_ARRIVAL group: detours on the way ---
-                    if (beforeActivities.isNotEmpty()) {
-                        Text(
-                            text = "\uD83D\uDEE3\uFE0F On the way to $destLabel",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = colors.orange,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                // Origin / destination as location strings for the Routes API
+                val originLocationForApi = when {
+                    dayMillis == trip.startMillis -> trip.startingPoint
+                    prevDayAccom != null -> prevDayAccom.location
+                    todayAccom != null -> todayAccom.location
+                    else -> trip.startingPoint
+                }
+                val destLocationForApi = when {
+                    isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint }
+                    todayAccom != null -> todayAccom.location
+                    else -> ""
+                }
+
+                // ── Auto-drive estimate (Google Routes API) ──
+                var autoDriveEstimate by remember { mutableStateOf<DrivingEstimate?>(null) }
+                var autoDriveLoading by remember { mutableStateOf(true) }
+
+                LaunchedEffect(originLocationForApi, destLocationForApi) {
+                    if (originLocationForApi.isNotBlank() && destLocationForApi.isNotBlank()) {
+                        autoDriveLoading = true
+                        val googleKey = try {
+                            val appInfo = context.packageManager.getApplicationInfo(
+                                context.packageName,
+                                android.content.pm.PackageManager.GET_META_DATA
+                            )
+                            appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+                        } catch (_: Exception) { "" }
+                        val openAiKey = ApiKeyStore.getOpenAiKey(context)
+                        val model = ApiKeyStore.getOpenAiModel(context)
+                        val estimate = DirectionsApiHelper.estimateDrivingTime(
+                            from = originLocationForApi,
+                            to = destLocationForApi,
+                            googleApiKey = googleKey,
+                            openAiApiKey = openAiKey,
+                            model = model,
                         )
-
-                        beforeActivities.forEachIndexed { index, activity ->
-                            val driveTo = activity.drivingTimeToMinutes ?: 0
-                            val fromLabel = if (index == 0) originLabel else beforeActivities[index - 1].name
-                            cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
-                            cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
+                        autoDriveEstimate = estimate
+                        autoDriveLoading = false
+                        // Persist the moving-day driving distance for fuel cost calculation
+                        val currentPlan = tripViewModel.getDayPlan(tripId, dayMillis)
+                        if (estimate != null && estimate.distanceKm > 0) {
+                            tripViewModel.setDayPlan(
+                                tripId,
+                                currentPlan.copy(movingDayDrivingDistanceKm = estimate.distanceKm)
+                            )
                         }
-
-                        // Drive from last detour to destination
-                        val arrivalDrive = beforeActivities.last().returnDrivingTimeMinutes ?: 0
-                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", arrivalDrive, colors)
+                    } else {
+                        autoDriveLoading = false
                     }
+                }
 
-                    // --- Arrival at destination ---
-                    Row(
+                if (beforeActivities.isEmpty()) {
+                    val driveMinutes = autoDriveEstimate?.timeMinutes ?: 0
+                    val driveDistKm = autoDriveEstimate?.distanceKm
+                    val arrivalMinutes = cumulativeMinutes + driveMinutes
+
+                    // --- Auto-drive card: drive from origin to destination ---
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(horizontal = 24.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = colors.orange.copy(alpha = 0.12f)
+                        ),
                     ) {
-                        Text(
-                            text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.comment,
-                            modifier = Modifier.width(48.dp),
-                        )
-                        Text(
-                            text = "$arrivalEmoji Arrived at $destLabel",
-                            fontSize = 12.sp,
-                            color = colors.green,
-                        )
-                    }
-
-                    // --- AFTER_ARRIVAL group: at destination ---
-                    if (afterActivities.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "\uD83D\uDCCC At $destLabel",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = colors.green,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                        )
-
-                        afterActivities.forEachIndexed { index, activity ->
-                            val driveTo = activity.drivingTimeToMinutes ?: 0
-                            val fromLabel = if (index == 0) destLabel else afterActivities[index - 1].name
-                            cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
-                            cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
-                        }
-
-                        // Return drive
-                        val returnDrive = afterActivities.last().returnDrivingTimeMinutes ?: 0
-                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", returnDrive, colors)
-
-                        // Back at destination
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Text(
-                                text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.comment,
-                                modifier = Modifier.width(48.dp),
-                            )
-                            Text(
-                                text = "$arrivalEmoji Back at $destLabel",
-                                fontSize = 12.sp,
-                                color = colors.pink,
-                            )
+                            Column(
+                                modifier = Modifier.width(52.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = "%02d:%02d".format(departureHour, departureMinute),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.orange,
+                                )
+                                if (driveMinutes > 0) {
+                                    Text("⬇", fontSize = 10.sp, color = colors.comment)
+                                    Text(
+                                        text = "%02d:%02d".format((arrivalMinutes / 60) % 24, arrivalMinutes % 60),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.green,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "🚗 Drive",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.foreground,
+                                )
+                                Text(
+                                    text = "📍 $originLabel → $destLabel",
+                                    fontSize = 12.sp,
+                                    color = colors.comment,
+                                )
+                                if (autoDriveLoading) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(14.dp),
+                                            strokeWidth = 2.dp,
+                                            color = colors.orange,
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "Estimating drive time…",
+                                            fontSize = 11.sp,
+                                            color = colors.comment,
+                                        )
+                                    }
+                                } else if (driveMinutes > 0) {
+                                    Spacer(Modifier.height(4.dp))
+                                    val distText = if (driveDistKm != null && driveDistKm > 0) {
+                                        "  •  %.0f km".format(driveDistKm)
+                                    } else ""
+                                    Text(
+                                        text = "🕐 ${formatMinutes(driveMinutes)}$distText",
+                                        fontSize = 12.sp,
+                                        color = colors.orange,
+                                    )
+                                }
+                            }
                         }
                     }
+                    cumulativeMinutes += driveMinutes
                 } else {
-                    // ── Staying Day Timeline ──
-                    dayActivities.forEachIndexed { index, activity ->
+                    // --- BEFORE_ARRIVAL group: detours on the way ---
+                    Text(
+                        text = "\uD83D\uDEE3\uFE0F On the way to $destLabel",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.orange,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    )
+
+                    beforeActivities.forEachIndexed { index, activity ->
                         val driveTo = activity.drivingTimeToMinutes ?: 0
-                        val fromLabel = if (index == 0) {
-                            todayAccom?.name?.ifBlank { todayAccom.location } ?: "Accommodation"
-                        } else {
-                            dayActivities[index - 1].name
-                        }
-                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors)
+                        val driveDistTo = activity.drivingDistanceToKm
+                        val fromLabel = if (index == 0) originLabel else beforeActivities[index - 1].name
+                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors, driveDistTo)
                         cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
                     }
 
-                    // Return segment
-                    val lastActivity = dayActivities.last()
-                    val returnDriveMin = lastActivity.returnDrivingTimeMinutes ?: 0
-                    val returnToLabel = todayAccom?.let {
-                        it.name.ifBlank { it.location.ifBlank { "Accommodation" } }
-                    } ?: "Accommodation"
+                    // Drive from last detour to destination
+                    val arrivalDrive = beforeActivities.last().returnDrivingTimeMinutes ?: 0
+                    val arrivalDist = beforeActivities.last().returnDrivingDistanceKm
+                    cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", arrivalDrive, colors, arrivalDist)
+                }
 
-                    cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $returnToLabel", returnDriveMin, colors)
+                // --- Arrival at destination ---
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.comment,
+                        modifier = Modifier.width(48.dp),
+                    )
+                    Text(
+                        text = "$arrivalEmoji Arrived at $destLabel",
+                        fontSize = 12.sp,
+                        color = colors.green,
+                    )
+                }
 
+                // --- AFTER_ARRIVAL group: at destination ---
+                if (afterActivities.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "\uD83D\uDCCC At $destLabel",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.green,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    )
+
+                    afterActivities.forEachIndexed { index, activity ->
+                        val driveTo = activity.drivingTimeToMinutes ?: 0
+                        val driveDistTo = activity.drivingDistanceToKm
+                        val fromLabel = if (index == 0) destLabel else afterActivities[index - 1].name
+                        cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors, driveDistTo)
+                        cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
+                    }
+
+                    // Return drive
+                    val returnDrive = afterActivities.last().returnDrivingTimeMinutes ?: 0
+                    val returnDist = afterActivities.last().returnDrivingDistanceKm
+                    cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $destLabel", returnDrive, colors, returnDist)
+
+                    // Back at destination
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -666,7 +768,7 @@ fun DayDetailScreen(
                             modifier = Modifier.width(48.dp),
                         )
                         Text(
-                            text = "\uD83C\uDFE0 Back at $returnToLabel",
+                            text = "$arrivalEmoji Back at $destLabel",
                             fontSize = 12.sp,
                             color = colors.pink,
                         )
@@ -674,6 +776,103 @@ fun DayDetailScreen(
                 }
 
                 // ── Day summary card ──
+                if (dayActivities.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    val totalDrivingMin = dayActivities.sumOf { it.drivingTimeToMinutes ?: 0 } +
+                        dayActivities.sumOf { it.returnDrivingTimeMinutes ?: 0 }
+                    val totalActivityMin = dayActivities.sumOf { it.durationMinutes }
+
+                    val endMinutes = cumulativeMinutes
+                    val finalH = (endMinutes / 60) % 24
+                    val finalM = endMinutes % 60
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = colors.primary.copy(alpha = 0.12f)
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Day Summary", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column {
+                                    Text("\uD83D\uDE97 Total travel", fontSize = 12.sp, color = colors.comment)
+                                    Text(formatMinutes(totalDrivingMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.orange)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("\u23F1 Total activity", fontSize = 12.sp, color = colors.comment)
+                                    Text(formatMinutes(totalActivityMin), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.green)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "Done at",
+                                        fontSize = 12.sp, color = colors.comment,
+                                    )
+                                    Text(
+                                        "%02d:%02d".format(finalH, finalM),
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.pink,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (dayActivities.isNotEmpty()) {
+                var cumulativeMinutes = departureHour * 60 + departureMinute
+
+                // ── Staying Day Timeline ──
+                dayActivities.forEachIndexed { index, activity ->
+                    val driveTo = activity.drivingTimeToMinutes ?: 0
+                    val driveDistTo = activity.drivingDistanceToKm
+                    val fromLabel = if (index == 0) {
+                        todayAccom?.name?.ifBlank { todayAccom.location } ?: "Accommodation"
+                    } else {
+                        dayActivities[index - 1].name
+                    }
+                    cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive from $fromLabel", driveTo, colors, driveDistTo)
+                    cumulativeMinutes = renderActivityCard(activity, cumulativeMinutes, colors, onEditActivity, tripId, tripViewModel)
+                }
+
+                // Return segment
+                val lastActivity = dayActivities.last()
+                val returnDriveMin = lastActivity.returnDrivingTimeMinutes ?: 0
+                val returnDistKm = lastActivity.returnDrivingDistanceKm
+                val returnToLabel = todayAccom?.let {
+                    it.name.ifBlank { it.location.ifBlank { "Accommodation" } }
+                } ?: "Accommodation"
+
+                cumulativeMinutes = renderDriveSegment(cumulativeMinutes, "Drive to $returnToLabel", returnDriveMin, colors, returnDistKm)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "%02d:%02d".format((cumulativeMinutes / 60) % 24, cumulativeMinutes % 60),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.comment,
+                        modifier = Modifier.width(48.dp),
+                    )
+                    Text(
+                        text = "\uD83C\uDFE0 Back at $returnToLabel",
+                        fontSize = 12.sp,
+                        color = colors.pink,
+                    )
+                }
+
+                // ── Day summary card (staying day) ──
                 Spacer(Modifier.height(8.dp))
                 val totalDrivingMin = dayActivities.sumOf { it.drivingTimeToMinutes ?: 0 } +
                     dayActivities.sumOf { it.returnDrivingTimeMinutes ?: 0 }
@@ -778,8 +977,12 @@ private fun renderDriveSegment(
     driveLabel: String,
     durationMinutes: Int,
     colors: AppColors,
+    distanceKm: Double? = null,
 ): Int {
     if (durationMinutes > 0) {
+        val distText = if (distanceKm != null && distanceKm > 0) {
+            "  •  %.0f km".format(distanceKm)
+        } else ""
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -794,7 +997,7 @@ private fun renderDriveSegment(
                 modifier = Modifier.width(48.dp),
             )
             Text(
-                text = "\uD83D\uDE97 $driveLabel (${formatMinutes(durationMinutes)})",
+                text = "\uD83D\uDE97 $driveLabel (${formatMinutes(durationMinutes)}$distText)",
                 fontSize = 12.sp,
                 color = colors.orange,
             )
@@ -849,42 +1052,56 @@ private fun renderActivityCard(
             Spacer(Modifier.width(8.dp))
 
             Column(Modifier.weight(1f)) {
-                val catEmoji = try {
-                    com.example.traveltool.data.ActivityCategory.valueOf(activity.category).emoji
-                } catch (_: Exception) { "\uD83D\uDCCC" }
-
-                Text(
-                    text = "$catEmoji ${activity.name}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.foreground,
-                )
-                Text(
-                    text = "\uD83D\uDCCD ${activity.location}",
-                    fontSize = 12.sp,
-                    color = colors.comment,
-                )
-                if (activity.description.isNotBlank()) {
+                if (activity.isDelay) {
                     Text(
-                        text = activity.description,
-                        fontSize = 11.sp,
+                        text = "⏳ ${activity.name}",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.foreground,
+                    )
+                    Text(
+                        text = "Waiting ${formatMinutes(activity.durationMinutes)}",
+                        fontSize = 12.sp,
                         color = colors.comment,
-                        maxLines = 2,
                     )
-                }
-                if (activity.rating != null) {
+                } else {
+                    val catEmoji = try {
+                        com.example.traveltool.data.ActivityCategory.valueOf(activity.category).emoji
+                    } catch (_: Exception) { "\uD83D\uDCCC" }
+
                     Text(
-                        text = "\u2B50 ${String.format("%.1f", activity.rating)}",
-                        fontSize = 12.sp,
-                        color = colors.yellow,
+                        text = "$catEmoji ${activity.name}",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.foreground,
                     )
-                }
-                if (activity.eatingType.isNotBlank()) {
                     Text(
-                        text = "\uD83C\uDF7D\uFE0F ${activity.eatingType}",
+                        text = "\uD83D\uDCCD ${activity.location}",
                         fontSize = 12.sp,
-                        color = colors.primary,
+                        color = colors.comment,
                     )
+                    if (activity.description.isNotBlank()) {
+                        Text(
+                            text = activity.description,
+                            fontSize = 11.sp,
+                            color = colors.comment,
+                            maxLines = 2,
+                        )
+                    }
+                    if (activity.rating != null) {
+                        Text(
+                            text = "\u2B50 ${String.format("%.1f", activity.rating)}",
+                            fontSize = 12.sp,
+                            color = colors.yellow,
+                        )
+                    }
+                    if (activity.eatingType.isNotBlank()) {
+                        Text(
+                            text = "\uD83C\uDF7D\uFE0F ${activity.eatingType}",
+                            fontSize = 12.sp,
+                            color = colors.primary,
+                        )
+                    }
                 }
             }
             IconButton(
