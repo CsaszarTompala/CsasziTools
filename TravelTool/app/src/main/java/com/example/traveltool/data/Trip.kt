@@ -8,6 +8,19 @@ import java.util.UUID
 enum class TravelMode { CAR, MICROBUS, PLANE }
 
 /**
+ * Vehicle emission / fuel type — used by the Routes API toll computation.
+ */
+enum class VehicleEmissionType {
+    GASOLINE, DIESEL, ELECTRIC;
+
+    val label: String get() = when (this) {
+        GASOLINE -> "⛽ Gasoline"
+        DIESEL   -> "⛽ Diesel"
+        ELECTRIC -> "⚡ Electric"
+    }
+}
+
+/**
  * A toll road / vignette entry.
  */
 data class TollRoad(
@@ -182,6 +195,7 @@ data class Trip(
     val startingPoint: String = "",
     val endingPoint: String = "",
     val travelMode: TravelMode = TravelMode.CAR,
+    val vehicleEmissionType: VehicleEmissionType = VehicleEmissionType.GASOLINE,
     val fuelConsumption: Double? = null,
     val fuelPricePerLiter: Double? = null,
     val fuelPriceCurrency: String = "EUR",

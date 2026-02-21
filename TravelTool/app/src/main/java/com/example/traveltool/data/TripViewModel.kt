@@ -1,8 +1,11 @@
 package com.example.traveltool.data
 
 import android.app.Application
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 
 /**
  * Shared ViewModel that holds the list of saved trips with JSON persistence.
@@ -50,6 +53,7 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         val trip = getTripById(tripId) ?: return
         val result = (trip.accommodations + newAccom).sortedBy { it.startMillis }
         updateTrip(trip.copy(accommodations = result))
+        refreshMovingDayEstimates(tripId)
     }
 
     /**
@@ -60,6 +64,7 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         val result = trip.accommodations.map { if (it.id == updated.id) updated else it }
             .sortedBy { it.startMillis }
         updateTrip(trip.copy(accommodations = result))
+        refreshMovingDayEstimates(tripId)
     }
 
     /**
@@ -69,6 +74,7 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         val trip = getTripById(tripId) ?: return
         val remaining = trip.accommodations.filter { it.id != accomId }
         updateTrip(trip.copy(accommodations = remaining))
+        refreshMovingDayEstimates(tripId)
     }
 
     // ── Day Plans ─────────────────────────────────────────────
@@ -105,6 +111,93 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
             trip.dayPlans + normalised
         }
         updateTrip(trip.copy(dayPlans = updated))
+    }
+
+    // ── Moving-day driving distance auto-estimation ─────────
+
+    /**
+     * Asynchronously (re-)estimate the driving distance for every moving day
+     * that doesn't have before-arrival activities.  Called automatically after
+     * accommodation add / update / delete so the fuel-cost estimate on the
+     * Travel Settings screen is always up-to-date.
+     */
+    fun refreshMovingDayEstimates(tripId: String) {
+        val trip = getTripById(tripId) ?: return
+        val ctx = getApplication<Application>()
+
+        viewModelScope.launch {
+            val googleKey = try {
+                val appInfo = ctx.packageManager.getApplicationInfo(
+                    ctx.packageName,
+                    android.content.pm.PackageManager.GET_META_DATA,
+                )
+                appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+            } catch (_: Exception) { "" }
+            val openAiKey = ApiKeyStore.getOpenAiKey(ctx)
+            val model = ApiKeyStore.getOpenAiModel(ctx)
+
+            val days = mutableListOf<Long>()
+            var d = trip.startMillis
+            while (d <= trip.endMillis) { days.add(d); d += ONE_DAY_MS }
+
+            fun findAccom(dayMillis: Long) = trip.accommodations.find {
+                it.startMillis <= dayMillis && dayMillis < it.endMillis
+            } ?: trip.accommodations.find {
+                it.startMillis <= dayMillis && dayMillis <= it.endMillis
+            }
+
+            for ((index, dayMillis) in days.withIndex()) {
+                val isFinalDay = dayMillis >= trip.endMillis
+                val todayAccom = findAccom(dayMillis)
+                val prevDayAccom = if (index > 0) findAccom(days[index - 1]) else null
+
+                val isMovingDay = when {
+                    index == 0 -> true
+                    isFinalDay -> true
+                    todayAccom == null -> false
+                    prevDayAccom == null -> true
+                    prevDayAccom.location != todayAccom.location -> true
+                    else -> false
+                }
+                if (!isMovingDay) continue
+
+                // Skip days with before-arrival activities (they manage their own distances)
+                val hasBeforeArrival = trip.activities.any { act ->
+                    act.dayMillis == dayMillis && !act.isDelay &&
+                        act.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
+                }
+                if (hasBeforeArrival) continue
+
+                val origin = when {
+                    dayMillis == trip.startMillis -> trip.startingPoint
+                    prevDayAccom != null -> prevDayAccom.location
+                    todayAccom != null -> todayAccom.location
+                    else -> trip.startingPoint
+                }
+                val destination = when {
+                    isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint }
+                    todayAccom != null -> todayAccom.location
+                    else -> ""
+                }
+                if (origin.isBlank() || destination.isBlank()) continue
+
+                try {
+                    val estimate = DirectionsApiHelper.estimateDrivingTime(
+                        from = origin,
+                        to = destination,
+                        googleApiKey = googleKey,
+                        openAiApiKey = openAiKey,
+                        model = model,
+                    )
+                    if (estimate != null && estimate.distanceKm > 0) {
+                        val plan = getDayPlan(tripId, dayMillis)
+                        setDayPlan(tripId, plan.copy(movingDayDrivingDistanceKm = estimate.distanceKm))
+                    }
+                } catch (e: Exception) {
+                    Log.w("TripViewModel", "Failed to estimate drive for day $dayMillis: ${e.message}")
+                }
+            }
+        }
     }
 
     // ── Activities ──────────────────────────────────────────────

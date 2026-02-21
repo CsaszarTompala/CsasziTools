@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 fun TravelSettingsScreen(
     tripId: String,
     tripViewModel: TripViewModel,
-    onApiKeySettings: () -> Unit,
     onFuelBreakdown: (String) -> Unit,
     onBack: () -> Unit
 ) {
@@ -79,8 +78,6 @@ fun TravelSettingsScreen(
     var editingFee by remember { mutableStateOf<AdditionalFee?>(null) }
     var feeToDelete by remember { mutableStateOf<AdditionalFee?>(null) }
 
-    var showMissingKeyDialog by remember { mutableStateOf(false) }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -124,11 +121,40 @@ fun TravelSettingsScreen(
 
             // ══════════════ CAR / MICROBUS MODE ══════════════
             if (trip.travelMode == TravelMode.CAR || trip.travelMode == TravelMode.MICROBUS) {
+                // ── Vehicle Emission Type ────────────────────
+                item {
+                    Text(
+                        "Vehicle type",
+                        fontSize = 13.sp,
+                        color = colors.comment,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        VehicleEmissionType.entries.forEach { type ->
+                            FilterChip(
+                                selected = trip.vehicleEmissionType == type,
+                                onClick = { tripViewModel.updateTrip(trip.copy(vehicleEmissionType = type)) },
+                                label = { Text(type.label, fontSize = 13.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = colors.primary,
+                                    selectedLabelColor = colors.foreground,
+                                ),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 item {
                     OutlinedTextField(
                         value = fuelText,
                         onValueChange = { fuelText = it; tripViewModel.updateTrip(trip.copy(fuelConsumption = it.toDoubleOrNull())) },
-                        label = { Text("Fuel consumption (L/100km)") },
+                        label = { Text(if (trip.vehicleEmissionType == VehicleEmissionType.ELECTRIC) "Energy consumption (kWh/100km)" else "Fuel consumption (L/100km)") },
                         placeholder = { Text("e.g. 7.5") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -147,7 +173,7 @@ fun TravelSettingsScreen(
                         OutlinedTextField(
                             value = fuelPriceText,
                             onValueChange = { fuelPriceText = it; tripViewModel.updateTrip(trip.copy(fuelPricePerLiter = it.toDoubleOrNull())) },
-                            label = { Text("Fuel price / liter") },
+                            label = { Text(if (trip.vehicleEmissionType == VehicleEmissionType.ELECTRIC) "Energy price / kWh" else "Fuel price / liter") },
                             placeholder = { Text("e.g. 1.65") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -247,30 +273,72 @@ fun TravelSettingsScreen(
                         }
                         Button(
                             onClick = {
-                                val apiKey = ApiKeyStore.getOpenAiKey(context)
-                                if (apiKey.isBlank()) {
-                                    showMissingKeyDialog = true
-                                    return@Button
-                                }
-                                val model = ApiKeyStore.getOpenAiModel(context)
                                 if (trip.startingPoint.isBlank()) { Toast.makeText(context, "Set a starting point first", Toast.LENGTH_SHORT).show(); return@Button }
                                 if (trip.accommodations.isEmpty()) { Toast.makeText(context, "Add accommodations first", Toast.LENGTH_SHORT).show(); return@Button }
+
+                                val googleKey = try {
+                                    val appInfo = context.packageManager.getApplicationInfo(
+                                        context.packageName,
+                                        android.content.pm.PackageManager.GET_META_DATA
+                                    )
+                                    appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
+                                } catch (_: Exception) { "" }
+
+                                if (googleKey.isBlank()) {
+                                    Toast.makeText(context, "Google Routes API key is missing", Toast.LENGTH_LONG).show()
+                                    return@Button
+                                }
+
+                                val routeSegments = buildTripDriveSegments(trip, requireDistance = false)
+                                if (routeSegments.isEmpty()) {
+                                    Toast.makeText(context, "No drivable segments found yet", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+
                                 isSearchingTolls = true
                                 scope.launch {
-                                    val autoTolls = DirectionsApiHelper.findTollsForTrip(
-                                        startingPoint = trip.startingPoint,
-                                        endingPoint = trip.endingPoint,
-                                        accommodations = trip.accommodations,
-                                        openAiApiKey = apiKey,
-                                        travelMode = trip.travelMode,
-                                        tripStartMillis = trip.startMillis,
-                                        tripEndMillis = trip.endMillis,
-                                        model = model
-                                    )
-                                    val userTolls = trip.tollRoads.filter { !it.isAutoGenerated }
-                                    tripViewModel.updateTrip(trip.copy(tollRoads = userTolls + autoTolls))
-                                    isSearchingTolls = false
-                                    Toast.makeText(context, if (autoTolls.isNotEmpty()) "Found ${autoTolls.size} toll(s) via AI" else "No tolls found — check API key or route", Toast.LENGTH_LONG).show()
+                                    try {
+                                        val openAiKey = ApiKeyStore.getOpenAiKey(context)
+                                        val openAiModel = ApiKeyStore.getOpenAiModel(context)
+
+                                        val autoTollsRaw = if (openAiKey.isNotBlank()) {
+                                            // Hybrid: use exact route segments + GPT for toll identification
+                                            DirectionsApiHelper.findTollsForSegmentsViaGpt(
+                                                routeSegments = routeSegments,
+                                                openAiApiKey = openAiKey,
+                                                travelMode = trip.travelMode,
+                                                model = openAiModel,
+                                            )
+                                        } else {
+                                            // Fallback: Routes API only (works for per-use tolls, not vignettes)
+                                            DirectionsApiHelper.findTollsForRouteSegments(
+                                                routeSegments = routeSegments,
+                                                googleApiKey = googleKey,
+                                                emissionType = trip.vehicleEmissionType,
+                                            )
+                                        }
+
+                                        val autoTolls = autoTollsRaw.map { toll ->
+                                            val converted = CurrencyManager.convert(
+                                                amount = toll.price,
+                                                from = toll.currency,
+                                                to = trip.displayCurrency,
+                                                rates = eurRates,
+                                            )
+                                            toll.copy(price = converted, currency = trip.displayCurrency)
+                                        }
+
+                                        val userTolls = trip.tollRoads.filter { !it.isAutoGenerated }
+                                        tripViewModel.updateTrip(trip.copy(tollRoads = userTolls + autoTolls))
+
+                                        Toast.makeText(
+                                            context,
+                                            if (autoTolls.isNotEmpty()) "Found ${autoTolls.size} toll(s)" else "No tolls found for current drive segments",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } finally {
+                                        isSearchingTolls = false
+                                    }
                                 }
                             },
                             enabled = !isSearchingTolls, modifier = Modifier.weight(1f),
@@ -278,7 +346,7 @@ fun TravelSettingsScreen(
                         ) {
                             if (isSearchingTolls) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.background)
                             else Icon(Icons.Default.Search, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp)); Text(if (isSearchingTolls) "AI…" else "Find tolls")
+                            Spacer(Modifier.width(4.dp)); Text(if (isSearchingTolls) "Searching…" else "Find tolls")
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -444,27 +512,6 @@ fun TravelSettingsScreen(
         DeleteConfirmDialog("Delete Fee", f.name, { tripViewModel.updateTrip(trip.copy(additionalFees = trip.additionalFees.filter { it.id != f.id })); feeToDelete = null }, { feeToDelete = null })
     }
 
-    if (showMissingKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showMissingKeyDialog = false },
-            title = { Text("API Key Required") },
-            text = { Text("To use automatic toll finding you need to set your OpenAI API key.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showMissingKeyDialog = false
-                        onApiKeySettings()
-                    }
-                ) { Text("Set API Key", color = colors.green) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMissingKeyDialog = false }) { Text("Cancel") }
-            },
-            containerColor = colors.current,
-            titleContentColor = colors.foreground,
-            textContentColor = colors.foreground,
-        )
-    }
 }
 
 // ════════════════ REUSABLE COMPOSABLES ════════════════

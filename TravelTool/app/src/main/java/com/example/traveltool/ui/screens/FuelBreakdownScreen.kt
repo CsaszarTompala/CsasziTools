@@ -14,8 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.traveltool.data.buildTripDriveSegments
 import com.example.traveltool.data.CurrencyManager
-import com.example.traveltool.data.TravelDayPosition
 import com.example.traveltool.data.TripViewModel
 import com.example.traveltool.ui.theme.*
 import java.text.SimpleDateFormat
@@ -56,134 +56,23 @@ fun FuelBreakdownScreen(
     val pricePerLiter = trip.fuelPricePerLiter ?: 0.0
     val currency = trip.fuelPriceCurrency
 
-    val oneDayMs = 24 * 60 * 60 * 1000L
     val dateFormat = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
 
-    // Build chronological list of all drive segments
-    val segments = remember(trip) {
-        val result = mutableListOf<DriveSegment>()
-
-        // Generate all trip days including the final day
-        val days = mutableListOf<Long>()
-        var d = trip.startMillis
-        while (d <= trip.endMillis) {
-            days.add(d)
-            d += oneDayMs
-        }
-
-        fun findAccomForDay(dayMillis: Long) = trip.accommodations.find {
-            it.startMillis <= dayMillis && dayMillis < it.endMillis
-        } ?: trip.accommodations.find {
-            it.startMillis <= dayMillis && dayMillis <= it.endMillis
-        }
-
-        fun calcFuel(km: Double): Pair<Double, Double> {
-            val litres = (km / 100.0) * consumption
+    // Build chronological list of all drive segments (shared with toll finder logic)
+    val segments = remember(trip, consumption, pricePerLiter) {
+        buildTripDriveSegments(trip).map { segment ->
+            val litres = (segment.distanceKm / 100.0) * consumption
             val cost = litres * pricePerLiter
-            return litres to cost
+            DriveSegment(
+                dayMillis = segment.dayMillis,
+                dayNumber = segment.dayNumber,
+                fromLabel = segment.fromLabel,
+                toLabel = segment.toLabel,
+                distanceKm = segment.distanceKm,
+                fuelLitres = litres,
+                fuelCost = cost,
+            )
         }
-
-        for ((index, dayMillis) in days.withIndex()) {
-            val dayNumber = index + 1
-            val isFinalDay = dayMillis >= trip.endMillis
-            val todayAccom = findAccomForDay(dayMillis)
-            val prevDayAccom = if (index > 0) findAccomForDay(days[index - 1]) else null
-
-            val isMovingDay = when {
-                index == 0 -> true
-                isFinalDay -> true
-                todayAccom == null -> false
-                prevDayAccom == null -> true
-                prevDayAccom.location != todayAccom.location -> true
-                else -> false
-            }
-
-            // Get activities for this day, sorted
-            val dayActivities = trip.activities
-                .filter { it.dayMillis == dayMillis && !it.isDelay }
-                .sortedBy { it.orderIndex }
-
-            if (isMovingDay) {
-                val originLabel = when {
-                    dayMillis == trip.startMillis -> trip.startingPoint.ifBlank { "Home" }
-                    prevDayAccom != null -> prevDayAccom.name.ifBlank { prevDayAccom.location }
-                    todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
-                    else -> trip.startingPoint.ifBlank { "Home" }
-                }
-                val destLabel = when {
-                    isFinalDay -> trip.endingPoint.ifBlank { trip.startingPoint.ifBlank { "Home" } }
-                    todayAccom != null -> todayAccom.name.ifBlank { todayAccom.location }
-                    else -> "Accommodation"
-                }
-
-                val beforeActivities = dayActivities.filter {
-                    it.travelDayPosition == TravelDayPosition.BEFORE_ARRIVAL.name
-                }.sortedBy { it.orderIndex }
-                val afterActivities = dayActivities.filter {
-                    it.travelDayPosition != TravelDayPosition.BEFORE_ARRIVAL.name
-                }.sortedBy { it.orderIndex }
-
-                if (beforeActivities.isEmpty()) {
-                    // Single auto-drive segment from origin to destination
-                    val dayPlan = trip.dayPlans.find { it.dayMillis == dayMillis }
-                    val dist = dayPlan?.movingDayDrivingDistanceKm ?: 0.0
-                    if (dist > 0) {
-                        val (litres, cost) = calcFuel(dist)
-                        result.add(DriveSegment(dayMillis, dayNumber, originLabel, destLabel, dist, litres, cost))
-                    }
-                } else {
-                    // Before-arrival detour chain
-                    beforeActivities.forEachIndexed { i, act ->
-                        val dist = act.drivingDistanceToKm ?: 0.0
-                        val fromLabel = if (i == 0) originLabel else beforeActivities[i - 1].name
-                        if (dist > 0) {
-                            val (litres, cost) = calcFuel(dist)
-                            result.add(DriveSegment(dayMillis, dayNumber, fromLabel, act.name, dist, litres, cost))
-                        }
-                    }
-                    // Drive from last detour to destination
-                    val lastBefore = beforeActivities.last()
-                    val returnDist = lastBefore.returnDrivingDistanceKm ?: 0.0
-                    if (returnDist > 0) {
-                        val (litres, cost) = calcFuel(returnDist)
-                        result.add(DriveSegment(dayMillis, dayNumber, lastBefore.name, destLabel, returnDist, litres, cost))
-                    }
-                }
-
-                // After-arrival activities
-                afterActivities.forEachIndexed { i, act ->
-                    val dist = act.drivingDistanceToKm ?: 0.0
-                    val fromLabel = if (i == 0) destLabel else afterActivities[i - 1].name
-                    if (dist > 0) {
-                        val (litres, cost) = calcFuel(dist)
-                        result.add(DriveSegment(dayMillis, dayNumber, fromLabel, act.name, dist, litres, cost))
-                    }
-                    val retDist = act.returnDrivingDistanceKm ?: 0.0
-                    if (retDist > 0 && i == afterActivities.lastIndex) {
-                        val (litres, cost) = calcFuel(retDist)
-                        result.add(DriveSegment(dayMillis, dayNumber, act.name, destLabel, retDist, litres, cost))
-                    }
-                }
-            } else {
-                // Staying day — activities
-                val accomLabel = todayAccom?.name?.ifBlank { todayAccom.location } ?: "Accommodation"
-                dayActivities.forEachIndexed { i, act ->
-                    val dist = act.drivingDistanceToKm ?: 0.0
-                    val fromLabel = if (i == 0) accomLabel else dayActivities[i - 1].name
-                    if (dist > 0) {
-                        val (litres, cost) = calcFuel(dist)
-                        result.add(DriveSegment(dayMillis, dayNumber, fromLabel, act.name, dist, litres, cost))
-                    }
-                    val retDist = act.returnDrivingDistanceKm ?: 0.0
-                    if (retDist > 0 && i == dayActivities.lastIndex) {
-                        val (litres, cost) = calcFuel(retDist)
-                        result.add(DriveSegment(dayMillis, dayNumber, act.name, accomLabel, retDist, litres, cost))
-                    }
-                }
-            }
-        }
-
-        result
     }
 
     val totalKm = segments.sumOf { it.distanceKm }

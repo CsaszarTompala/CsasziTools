@@ -150,9 +150,6 @@ fun TravelToolNavHost(navController: NavHostController) {
             TravelSettingsScreen(
                 tripId = tripId,
                 tripViewModel = tripViewModel,
-                onApiKeySettings = {
-                    navController.navigate(Screen.ApiKey.route)
-                },
                 onFuelBreakdown = { id ->
                     navController.navigate("${Screen.FuelBreakdown.route}/$id")
                 },
