@@ -276,16 +276,11 @@ fun TravelSettingsScreen(
                                 if (trip.startingPoint.isBlank()) { Toast.makeText(context, "Set a starting point first", Toast.LENGTH_SHORT).show(); return@Button }
                                 if (trip.accommodations.isEmpty()) { Toast.makeText(context, "Add accommodations first", Toast.LENGTH_SHORT).show(); return@Button }
 
-                                val googleKey = try {
-                                    val appInfo = context.packageManager.getApplicationInfo(
-                                        context.packageName,
-                                        android.content.pm.PackageManager.GET_META_DATA
-                                    )
-                                    appInfo.metaData?.getString("com.google.android.geo.API_KEY") ?: ""
-                                } catch (_: Exception) { "" }
+                                val openAiKey = try { ApiKeyStore.getOpenAiKey(context) } catch (_: Exception) { "" }
+                                val openAiModel = try { ApiKeyStore.getOpenAiModel(context) } catch (_: Exception) { "" }
 
-                                if (googleKey.isBlank()) {
-                                    Toast.makeText(context, "Google Routes API key is missing", Toast.LENGTH_LONG).show()
+                                if (openAiKey.isBlank()) {
+                                    Toast.makeText(context, "OpenAI API key is required for toll search", Toast.LENGTH_LONG).show()
                                     return@Button
                                 }
 
@@ -298,25 +293,12 @@ fun TravelSettingsScreen(
                                 isSearchingTolls = true
                                 scope.launch {
                                     try {
-                                        val openAiKey = ApiKeyStore.getOpenAiKey(context)
-                                        val openAiModel = ApiKeyStore.getOpenAiModel(context)
-
-                                        val autoTollsRaw = if (openAiKey.isNotBlank()) {
-                                            // Hybrid: use exact route segments + GPT for toll identification
-                                            DirectionsApiHelper.findTollsForSegmentsViaGpt(
-                                                routeSegments = routeSegments,
-                                                openAiApiKey = openAiKey,
-                                                travelMode = trip.travelMode,
-                                                model = openAiModel,
-                                            )
-                                        } else {
-                                            // Fallback: Routes API only (works for per-use tolls, not vignettes)
-                                            DirectionsApiHelper.findTollsForRouteSegments(
-                                                routeSegments = routeSegments,
-                                                googleApiKey = googleKey,
-                                                emissionType = trip.vehicleEmissionType,
-                                            )
-                                        }
+                                        val autoTollsRaw = DirectionsApiHelper.findTollsForSegmentsViaGpt(
+                                            routeSegments = routeSegments,
+                                            openAiApiKey = openAiKey,
+                                            travelMode = trip.travelMode,
+                                            model = openAiModel,
+                                        )
 
                                         val autoTolls = autoTollsRaw.map { toll ->
                                             val converted = CurrencyManager.convert(

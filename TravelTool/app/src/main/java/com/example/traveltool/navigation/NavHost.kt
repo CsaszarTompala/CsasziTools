@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.traveltool.data.CurrencyManager
 import com.example.traveltool.data.Trip
 import com.example.traveltool.data.TripViewModel
 import com.example.traveltool.ui.screens.*
@@ -335,12 +336,30 @@ private fun autoDetectStartingPoint(
                 } catch (_: Exception) {
                     "${location.latitude}, ${location.longitude}"
                 }
+
+                val detectedCurrency = try {
+                    @Suppress("DEPRECATION")
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                    val countryCode = addresses?.firstOrNull()?.countryCode?.uppercase()?.trim()
+                    if (countryCode.isNullOrBlank()) null
+                    else java.util.Currency.getInstance(Locale("", countryCode)).currencyCode
+                } catch (_: Exception) {
+                    null
+                }
+
+                val supportedCurrencies = CurrencyManager.getCurrencyList(context)
+                val defaultDisplayCurrency =
+                    detectedCurrency?.takeIf { it in supportedCurrencies } ?: "EUR"
+
                 withContext(Dispatchers.Main) {
                     val trip = tripViewModel.getTripById(tripId)
                     if (trip != null && trip.startingPoint.isBlank()) {
                         tripViewModel.updateTrip(trip.copy(
                             startingPoint = name,
-                            endingPoint = if (trip.endingPoint.isBlank()) name else trip.endingPoint
+                            endingPoint = if (trip.endingPoint.isBlank()) name else trip.endingPoint,
+                            displayCurrency =
+                                if (trip.displayCurrency == "EUR") defaultDisplayCurrency else trip.displayCurrency,
                         ))
                     }
                 }

@@ -87,6 +87,26 @@ fun AddAccommodationScreen(
         position = CameraPosition.fromLatLngZoom(LatLng(48.8566, 2.3522), 5f)
     }
 
+    // Centre map on the trip's starting point (or trip location) on first composition
+    LaunchedEffect(Unit) {
+        val loc = trip.startingPoint.ifBlank { trip.location }
+        if (loc.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    @Suppress("DEPRECATION")
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    val addresses = geocoder.getFromLocationName(loc.trim(), 1)
+                    if (!addresses.isNullOrEmpty()) {
+                        val pos = LatLng(addresses[0].latitude, addresses[0].longitude)
+                        cameraPositionState.move(
+                            CameraUpdateFactory.newLatLngZoom(pos, 6f)
+                        )
+                    }
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
     fun searchLocation() {
         if (accomLocation.isBlank()) return
         scope.launch {
@@ -199,7 +219,9 @@ fun AddAccommodationScreen(
                                 endMillis = endMillis!!,
                                 pricePerNight = price,
                                 priceCurrency = priceCurrency,
-                                location = accomLocation.trim()
+                                location = accomLocation.trim(),
+                                latitude = markerPosition?.latitude,
+                                longitude = markerPosition?.longitude,
                             )
                             tripViewModel.addAccommodation(tripId, accom)
                             onBack()

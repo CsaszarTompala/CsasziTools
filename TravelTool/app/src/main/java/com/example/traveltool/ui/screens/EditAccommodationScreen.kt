@@ -64,7 +64,14 @@ fun EditAccommodationScreen(
     var priceText by remember { mutableStateOf(accom.pricePerNight?.toString() ?: "") }
     var priceCurrency by remember { mutableStateOf(accom.priceCurrency) }
     var accomLocation by remember { mutableStateOf(accom.location) }
-    var markerPosition by remember { mutableStateOf<LatLng?>(null) }
+    // Initialise marker from stored coordinates (no geocoding needed for existing data)
+    var markerPosition by remember {
+        mutableStateOf(
+            if (accom.latitude != null && accom.longitude != null)
+                LatLng(accom.latitude, accom.longitude)
+            else null
+        )
+    }
 
     // Track whether the name was auto-generated or user-provided
     fun autoName(location: String) = if (location.isNotBlank()) "Staying at $location" else ""
@@ -83,11 +90,16 @@ fun EditAccommodationScreen(
     val scope = rememberCoroutineScope()
 
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(48.8566, 2.3522), 5f)
+        // Start from stored accommodation coordinates if available
+        position = if (accom.latitude != null && accom.longitude != null)
+            CameraPosition.fromLatLngZoom(LatLng(accom.latitude, accom.longitude), 12f)
+        else
+            CameraPosition.fromLatLngZoom(LatLng(48.8566, 2.3522), 5f)
     }
 
-    // Pre-search current accommodation location on first composition
+    // If no stored coordinates, geocode the accommodation location (or trip location) on first composition
     LaunchedEffect(Unit) {
+        if (accom.latitude != null && accom.longitude != null) return@LaunchedEffect   // already positioned
         val loc = accomLocation.ifBlank { trip.location }
         if (loc.isNotBlank()) {
             withContext(Dispatchers.IO) {
@@ -185,7 +197,9 @@ fun EditAccommodationScreen(
                                 endMillis = endMillis!!,
                                 pricePerNight = price,
                                 priceCurrency = priceCurrency,
-                                location = accomLocation.trim()
+                                location = accomLocation.trim(),
+                                latitude = markerPosition?.latitude,
+                                longitude = markerPosition?.longitude,
                             )
                             tripViewModel.updateAccommodation(tripId, updated)
                             onBack()

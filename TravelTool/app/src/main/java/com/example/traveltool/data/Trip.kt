@@ -85,7 +85,9 @@ data class Accommodation(
     val endMillis: Long = 0L,
     val pricePerNight: Double? = null,
     val priceCurrency: String = "EUR",
-    val location: String = ""
+    val location: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 ) {
     /** True when any required field is missing / blank. */
     val hasWarning: Boolean
