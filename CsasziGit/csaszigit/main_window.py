@@ -1,21 +1,19 @@
 """
-Main window — assembles every panel into a Git-Extensions-style layout.
+Main window — fully dockable Git-Extensions-style layout.
 
-Layout
-------
-┌─────────────────────────────────────────────────────────────────┐
-│  Menu bar   (File, View, Git, Tools, Help)                     │
-├─────────────────────────────────────────────────────────────────┤
-│  Toolbar    (Open, Refresh, Commit, Push, Pull, Fetch, Stash)  │
-├──────────┬──────────────────────────────────────────────────────┤
-│ Branches │  Commit history (graph + table)                     │
-│          ├──────────────────────────┬───────────────────────────┤
-│          │  File status (staged /   │  Diff viewer              │
-│          │  unstaged / untracked)   │                           │
-├──────────┴──────────────────────────┴───────────────────────────┤
-│ Status bar  (branch, repo path)                                │
-└─────────────────────────────────────────────────────────────────┘
-AI Assistant is a togglable dock widget on the right.
+Every panel is a QDockWidget that can be dragged next-to, above, or
+below any other panel, floated, closed (x), and restored via the
+*Window* menu.
+
+Default layout
+--------------
+┌──────────┬────────────────────────────────┬──────────────┐
+│ Branches │  Commit Log                    │ AI Assistant │
+│          ├────────────────────────────────┤ / Terminal   │
+│          │  Diff Viewer | Diff Only (tabs)│              │
+├──────────┴────────────────────────────────┴──────────────┤
+│ Status bar  (branch, repo path)                         │
+└─────────────────────────────────────────────────────────┘
 """
 
 import os
@@ -23,7 +21,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QHBoxLayout,
     QMenuBar, QMenu, QToolBar, QStatusBar, QFileDialog,
     QMessageBox, QInputDialog, QLabel, QDockWidget, QApplication,
-    QTextEdit, QPlainTextEdit, QPushButton, QDialog,
+    QTextEdit, QPushButton, QDialog,
 )
 from PyQt6.QtGui import QAction, QFont, QKeySequence
 from PyQt6.QtCore import Qt, QTimer
@@ -37,6 +35,8 @@ from csaszigit.widgets.file_status import FileStatusPanel
 from csaszigit.widgets.diff_viewer import DiffViewer
 from csaszigit.widgets.branch_panel import BranchPanel
 from csaszigit.widgets.ai_assistant import AiAssistantPanel
+from csaszigit.widgets.git_terminal import GitTerminalPanel
+from csaszigit.widgets.folder_browser import FolderBrowserPanel
 from csaszigit.widgets.settings_dialog import SettingsDialog
 
 
@@ -51,20 +51,19 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("CsasziGit")
         self.resize(1280, 800)
 
-        # Restore geometry
+        # ── Build UI ──────────────────────────────────────────
+        self._build_menu()
+        self._build_toolbar()
+        self._build_panels()          # creates all dock widgets
+        self._build_statusbar()
+
+        # Restore geometry / dock state AFTER panels are created
         geo = settings.window_geometry
         if geo:
             self.restoreGeometry(geo)
         state = settings.window_state
         if state:
             self.restoreState(state)
-
-        # ── Build UI ──────────────────────────────────────────
-        self._build_menu()
-        self._build_toolbar()
-        self._build_panels()
-        self._build_statusbar()
-        self._build_ai_dock()
 
         # ── Open last repo or prompt ──────────────────────────
         last = settings.last_repo
@@ -98,21 +97,18 @@ class MainWindow(QMainWindow):
         # ── View ──────────────────────────────────────────────
         view_menu = mb.addMenu("&View")
 
-        self._act_ai = QAction("AI Assistant", self)
-        self._act_ai.setCheckable(True)
-        self._act_ai.setChecked(True)
-        self._act_ai.setShortcut(QKeySequence("Ctrl+Shift+A"))
-        view_menu.addAction(self._act_ai)
-
         act_refresh = QAction("&Refresh", self)
         act_refresh.setShortcut(QKeySequence("F5"))
         act_refresh.triggered.connect(self._refresh_all)
         view_menu.addAction(act_refresh)
 
+        # ── Window (populated after panels are built) ─────────
+        self._window_menu = mb.addMenu("&Window")
+
         # ── Git ───────────────────────────────────────────────
         git_menu = mb.addMenu("&Git")
 
-        act_commit = QAction("&Commit…", self)
+        act_commit = QAction("&Add / Commit…", self)
         act_commit.setShortcut(QKeySequence("Ctrl+Return"))
         act_commit.triggered.connect(self._on_commit)
         git_menu.addAction(act_commit)
@@ -133,6 +129,11 @@ class MainWindow(QMainWindow):
         act_fetch.setShortcut(QKeySequence("Ctrl+Shift+F"))
         act_fetch.triggered.connect(self._on_fetch)
         git_menu.addAction(act_fetch)
+
+        act_fetch_all = QAction("Fetch &All", self)
+        act_fetch_all.setShortcut(QKeySequence("Ctrl+Alt+F"))
+        act_fetch_all.triggered.connect(self._on_fetch_all)
+        git_menu.addAction(act_fetch_all)
 
         git_menu.addSeparator()
 
@@ -177,7 +178,7 @@ class MainWindow(QMainWindow):
 
         tb.addSeparator()
 
-        self._tb_commit = tb.addAction("✓  Commit")
+        self._tb_commit = tb.addAction("➕ Add/Commit")
         self._tb_commit.triggered.connect(self._on_commit)
 
         self._tb_push = tb.addAction("⬆  Push")
@@ -188,6 +189,9 @@ class MainWindow(QMainWindow):
 
         self._tb_fetch = tb.addAction("📥 Fetch")
         self._tb_fetch.triggered.connect(self._on_fetch)
+
+        self._tb_fetch_all = tb.addAction("📥📥 Fetch All")
+        self._tb_fetch_all.triggered.connect(self._on_fetch_all)
 
         tb.addSeparator()
 
@@ -202,48 +206,74 @@ class MainWindow(QMainWindow):
     # =====================================================================
 
     def _build_panels(self):
-        # Create panels
+        # All content lives in dock widgets; central widget is hidden.
+        self.setDockNestingEnabled(True)
+        _central = QWidget()
+        _central.setMaximumSize(0, 0)
+        self.setCentralWidget(_central)
+
+        # ── Create panels ─────────────────────────────────────
         self._branch_panel = BranchPanel()
         self._commit_log = CommitLogPanel()
-        self._file_status = FileStatusPanel()
         self._diff_viewer = DiffViewer()
+        self._diff_only_viewer = DiffViewer()
+
+        self._ai_panel = AiAssistantPanel()
+        self._ai_panel.commands_executed.connect(self._refresh_all)
+        self._terminal_panel = GitTerminalPanel()
+        self._terminal_panel.commands_executed.connect(self._refresh_all)
+        self._folder_browser = FolderBrowserPanel()
 
         # Connect signals
         self._commit_log.commit_selected.connect(self._on_commit_selected)
-        self._file_status.file_selected.connect(self._on_file_selected)
-        self._file_status.untracked_selected.connect(self._on_untracked_selected)
-        self._file_status.status_changed.connect(self._on_status_changed)
+        self._commit_log.compare_requested.connect(self._on_compare_commits)
         self._branch_panel.branch_changed.connect(self._refresh_all)
+        self._folder_browser.repo_selected.connect(self._open_repo)
 
-        # Layout using splitters
-        # Top-level: horizontal splitter  [branches | main_area]
-        main_hsplit = QSplitter(Qt.Orientation.Horizontal)
+        # ── Wrap each panel in a QDockWidget ──────────────────
+        self._branch_dock = self._make_dock("Branches", self._branch_panel)
+        self._log_dock = self._make_dock("Commit Log", self._commit_log)
+        self._diff_dock = self._make_dock("Diff Viewer", self._diff_viewer)
+        self._diff_only_dock = self._make_dock("Diff Only", self._diff_only_viewer)
+        self._ai_dock = self._make_dock("AI Assistant", self._ai_panel, min_w=320)
+        self._terminal_dock = self._make_dock("Git Terminal", self._terminal_panel, min_w=360)
+        self._folder_dock = self._make_dock("Folder Browser", self._folder_browser)
 
-        # Left: branch panel
-        main_hsplit.addWidget(self._branch_panel)
+        # ── Default arrangement ───────────────────────────
+        # Left column — branches + folder browser below
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._branch_dock)
 
-        # Right: vertical splitter [commit log | bottom area]
-        right_vsplit = QSplitter(Qt.Orientation.Vertical)
+        # Centre column — commit log on top, diff tabs below
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._log_dock)
+        self.splitDockWidget(self._log_dock, self._diff_dock, Qt.Orientation.Vertical)
+        self.tabifyDockWidget(self._diff_dock, self._diff_only_dock)
+        self._diff_dock.raise_()  # Diff Viewer tab active by default
 
-        right_vsplit.addWidget(self._commit_log)
+        # Left column — folder browser below branches
+        self.splitDockWidget(self._branch_dock, self._folder_dock, Qt.Orientation.Vertical)
 
-        # Bottom: horizontal splitter [file status | diff viewer]
-        bottom_hsplit = QSplitter(Qt.Orientation.Horizontal)
-        bottom_hsplit.addWidget(self._file_status)
-        bottom_hsplit.addWidget(self._diff_viewer)
-        bottom_hsplit.setStretchFactor(0, 1)
-        bottom_hsplit.setStretchFactor(1, 2)
+        # Right column — AI + Terminal as tabs
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._ai_dock)
+        self.tabifyDockWidget(self._ai_dock, self._terminal_dock)
+        self._ai_dock.raise_()
 
-        right_vsplit.addWidget(bottom_hsplit)
-        right_vsplit.setStretchFactor(0, 2)
-        right_vsplit.setStretchFactor(1, 1)
+        # Initial proportions (horizontal: branches | main | AI)
+        self.resizeDocks(
+            [self._branch_dock, self._log_dock, self._ai_dock],
+            [220, 700, 360],
+            Qt.Orientation.Horizontal,
+        )
+        self.resizeDocks(
+            [self._log_dock, self._diff_dock],
+            [500, 280],
+            Qt.Orientation.Vertical,
+        )
 
-        main_hsplit.addWidget(right_vsplit)
-        main_hsplit.setStretchFactor(0, 0)
-        main_hsplit.setStretchFactor(1, 1)
-        main_hsplit.setSizes([220, 1060])
+        # ── Populate Window menu ──────────────────────────────
+        self._populate_window_menu()
 
-        self.setCentralWidget(main_hsplit)
+        # Configure AI from settings
+        self._ai_panel.configure(self._settings.gpt_api_key, self._settings.gpt_model)
 
     # =====================================================================
     # Status bar
@@ -260,27 +290,78 @@ class MainWindow(QMainWindow):
         sb.addPermanentWidget(self._status_path)
 
     # =====================================================================
-    # AI dock
+    # Dock helpers
     # =====================================================================
 
-    def _build_ai_dock(self):
-        self._ai_panel = AiAssistantPanel()
-        self._ai_panel.commands_executed.connect(self._refresh_all)
-
-        dock = QDockWidget("AI Assistant", self)
-        dock.setWidget(self._ai_panel)
-        dock.setAllowedAreas(
-            Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea
+    def _make_dock(self, title: str, widget: QWidget, min_w: int = 0) -> QDockWidget:
+        """Wrap *widget* in a closable, movable, floatable QDockWidget."""
+        dock = QDockWidget(title, self)
+        dock.setObjectName(title)          # stable key for saveState
+        dock.setWidget(widget)
+        dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
         )
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
-        dock.setMinimumWidth(320)
+        if min_w:
+            dock.setMinimumWidth(min_w)
+        return dock
 
-        # Wire toggle
-        self._act_ai.toggled.connect(dock.setVisible)
-        dock.visibilityChanged.connect(self._act_ai.setChecked)
+    def _populate_window_menu(self):
+        """Fill the *Window* menu with toggle-visibility actions for every dock."""
+        shortcuts = {
+            "AI Assistant": "Ctrl+Shift+A",
+            "Git Terminal": "Ctrl+Shift+T",
+        }
+        for dock in (
+            self._branch_dock,
+            self._folder_dock,
+            self._log_dock,
+            self._diff_dock,
+            self._diff_only_dock,
+            self._ai_dock,
+            self._terminal_dock,
+        ):
+            act = dock.toggleViewAction()
+            sc = shortcuts.get(dock.windowTitle())
+            if sc:
+                act.setShortcut(QKeySequence(sc))
+            self._window_menu.addAction(act)
 
-        # Configure from settings
-        self._ai_panel.configure(self._settings.gpt_api_key, self._settings.gpt_model)
+        self._window_menu.addSeparator()
+        act_restore = QAction("Restore &Default Layout", self)
+        act_restore.triggered.connect(self._restore_default_layout)
+        self._window_menu.addAction(act_restore)
+
+    def _restore_default_layout(self):
+        """Show every dock and reset to the default arrangement."""
+        for dock in (
+            self._branch_dock, self._folder_dock,
+            self._log_dock, self._diff_dock,
+            self._diff_only_dock, self._ai_dock,
+            self._terminal_dock,
+        ):
+            dock.setVisible(True)
+            dock.setFloating(False)
+
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._branch_dock)
+        self.splitDockWidget(self._branch_dock, self._folder_dock, Qt.Orientation.Vertical)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._log_dock)
+        self.splitDockWidget(self._log_dock, self._diff_dock, Qt.Orientation.Vertical)
+        self.tabifyDockWidget(self._diff_dock, self._diff_only_dock)
+        self._diff_dock.raise_()
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._ai_dock)
+        self.tabifyDockWidget(self._ai_dock, self._terminal_dock)
+        self._ai_dock.raise_()
+        self.resizeDocks(
+            [self._branch_dock, self._log_dock, self._ai_dock],
+            [220, 700, 360], Qt.Orientation.Horizontal,
+        )
+        self.resizeDocks(
+            [self._log_dock, self._diff_dock],
+            [500, 280], Qt.Orientation.Vertical,
+        )
 
     # =====================================================================
     # Repo operations
@@ -310,6 +391,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(f"CsasziGit — {os.path.basename(root)}")
         self._ai_panel.set_repo(root)
+        self._terminal_panel.set_repo(root)
 
         self._refresh_all()
 
@@ -326,8 +408,8 @@ class MainWindow(QMainWindow):
 
         self._branch_panel.load(self._repo)
         self._commit_log.load(self._repo)
-        self._file_status.load(self._repo)
         self._diff_viewer.clear()
+        self._diff_only_viewer.clear()
 
     # =====================================================================
     # Signal handlers
@@ -339,29 +421,42 @@ class MainWindow(QMainWindow):
         try:
             diff = git_ops.get_commit_diff(self._repo, commit_hash)
             self._diff_viewer.show_diff(diff, title=f"Commit {commit_hash[:8]}")
+            self._diff_only_viewer.show_diff(
+                self._filter_diff_only(diff),
+                title=f"Diff Only — {commit_hash[:8]}",
+            )
         except Exception as e:
             self._diff_viewer.show_diff(str(e), title="Error")
+            self._diff_only_viewer.show_diff(str(e), title="Error")
 
-    def _on_file_selected(self, filepath: str, is_staged: bool):
+    def _on_compare_commits(self, hash1: str, hash2: str):
+        """Launch CsasziCompare to compare two commits."""
         if not self._repo:
             return
-        try:
-            diff = git_ops.get_diff(self._repo, filepath, staged=is_staged)
-            if not diff.strip():
-                diff = "(no diff available)"
-            self._diff_viewer.show_diff(diff, title=filepath)
-        except Exception as e:
-            self._diff_viewer.show_diff(str(e), title="Error")
-
-    def _on_untracked_selected(self, filepath: str):
-        if not self._repo:
+        compare_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "..", "CsasziCompare",
+        )
+        compare_main = os.path.normpath(os.path.join(compare_dir, "main.py"))
+        if not os.path.isfile(compare_main):
+            QMessageBox.warning(
+                self, "CsasziCompare Not Found",
+                f"Cannot find CsasziCompare at:\n{compare_main}",
+            )
             return
-        diff = git_ops.get_diff_for_untracked(self._repo, filepath)
-        self._diff_viewer.show_diff(diff, title=f"(new) {filepath}")
 
-    def _on_status_changed(self):
-        """After staging/unstaging refresh the file list but not the whole log."""
-        self._file_status.refresh()
+        import subprocess as _sp
+        import sys as _sys
+        _sp.Popen(
+            [_sys.executable, compare_main,
+             "--repo", self._repo,
+             "--commit1", hash1,
+             "--commit2", hash2],
+            cwd=compare_dir,
+        )
+        self.statusBar().showMessage(
+            f"Launched CsasziCompare: {hash1[:8]} ↔ {hash2[:8]}", 4000,
+        )
 
     # =====================================================================
     # Git actions
@@ -370,70 +465,60 @@ class MainWindow(QMainWindow):
     def _on_commit(self):
         if not self._repo:
             return
-        if self._file_status.staged_count() == 0:
-            QMessageBox.information(
-                self, "Nothing Staged",
-                "Stage some files first before committing.",
-            )
-            return
         self._show_commit_dialog()
 
     def _show_commit_dialog(self):
-        dlg = _CommitDialog(self._repo, self)
+        dlg = _IndexCommitDialog(self._repo, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._refresh_all()
 
     def _on_push(self):
         if not self._repo:
             return
-        try:
-            msg = git_ops.push(self._repo)
-            QMessageBox.information(self, "Push", msg or "Push successful.")
-        except git_ops.GitError as e:
-            QMessageBox.warning(self, "Push Error", str(e))
-        self._refresh_all()
+        self._run_git_action("Push", lambda: git_ops.push(self._repo), "Push successful.")
 
     def _on_pull(self):
         if not self._repo:
             return
-        try:
-            msg = git_ops.pull(self._repo)
-            QMessageBox.information(self, "Pull", msg or "Pull successful.")
-        except git_ops.GitError as e:
-            QMessageBox.warning(self, "Pull Error", str(e))
-        self._refresh_all()
+        self._run_git_action("Pull", lambda: git_ops.pull(self._repo), "Pull successful.")
 
     def _on_fetch(self):
         if not self._repo:
             return
-        try:
-            msg = git_ops.fetch_all(self._repo)
-            QMessageBox.information(self, "Fetch", msg or "Fetch successful.")
-        except git_ops.GitError as e:
-            QMessageBox.warning(self, "Fetch Error", str(e))
-        self._refresh_all()
+        self._run_git_action("Fetch", lambda: git_ops.fetch(self._repo), "Fetch successful.")
+
+    def _on_fetch_all(self):
+        if not self._repo:
+            return
+        self._run_git_action(
+            "Fetch All", lambda: git_ops.fetch_all(self._repo), "Fetch all successful."
+        )
 
     def _on_stash(self):
         if not self._repo:
             return
         msg, ok = QInputDialog.getText(self, "Stash", "Stash message (optional):")
         if ok:
-            try:
-                out = git_ops.stash_save(self._repo, msg.strip())
-                QMessageBox.information(self, "Stash", out or "Stashed.")
-            except git_ops.GitError as e:
-                QMessageBox.warning(self, "Stash Error", str(e))
-            self._refresh_all()
+            self._run_git_action(
+                "Stash", lambda: git_ops.stash_save(self._repo, msg.strip()), "Stashed."
+            )
 
     def _on_stash_pop(self):
         if not self._repo:
             return
+        self._run_git_action("Stash Pop", lambda: git_ops.stash_pop(self._repo), "Stash applied.")
+
+    def _run_git_action(self, title: str, func, success_fallback: str):
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.statusBar().showMessage(f"{title} in progress…", 2000)
         try:
-            out = git_ops.stash_pop(self._repo)
-            QMessageBox.information(self, "Stash Pop", out or "Stash applied.")
+            msg = func()
+            QMessageBox.information(self, title, msg or success_fallback)
         except git_ops.GitError as e:
-            QMessageBox.warning(self, "Stash Pop Error", str(e))
-        self._refresh_all()
+            QMessageBox.warning(self, f"{title} Error", str(e))
+        finally:
+            QApplication.restoreOverrideCursor()
+            self._refresh_all()
 
     def _on_settings(self):
         dlg = SettingsDialog(self._settings, self)
@@ -459,21 +544,63 @@ class MainWindow(QMainWindow):
         self._settings.window_state = self.saveState()
         super().closeEvent(event)
 
+    # =====================================================================
+    # Diff-only filter
+    # =====================================================================
+
+    @staticmethod
+    def _filter_diff_only(diff_text: str) -> str:
+        """Strip context lines, keeping file headers, hunks, and +/- changes."""
+        result: list[str] = []
+        for line in diff_text.splitlines():
+            if (
+                line.startswith("diff --git")
+                or line.startswith("@@")
+                or line.startswith("+")
+                or line.startswith("-")
+            ):
+                result.append(line)
+        return "\n".join(result)
+
 
 # =========================================================================
-# Commit dialog (inline helper)
+# Add/Commit dialog (inline helper)
 # =========================================================================
 
-class _CommitDialog(QDialog):
-    """Simple commit dialog with a message editor."""
+class _IndexCommitDialog(QDialog):
+    """Git-Extensions-style add/commit dialog with staging panes and diff."""
 
     def __init__(self, repo: str, parent=None):
         super().__init__(parent)
         self._repo = repo
-        self.setWindowTitle("Commit")
-        self.setMinimumSize(520, 300)
+        self.setWindowTitle("Add / Commit")
+        self.setMinimumSize(1100, 720)
 
         lay = QVBoxLayout(self)
+
+        content_split = QSplitter(Qt.Orientation.Horizontal)
+        content_split.setOpaqueResize(False)
+
+        self._file_status = FileStatusPanel()
+        self._file_status.load(repo)
+        self._file_status.file_selected.connect(self._on_file_selected)
+        self._file_status.untracked_selected.connect(self._on_untracked_selected)
+        self._file_status.status_changed.connect(self._on_status_changed)
+
+        self._diff_viewer = DiffViewer()
+
+        content_split.addWidget(self._file_status)
+        content_split.addWidget(self._diff_viewer)
+        content_split.setStretchFactor(0, 1)
+        content_split.setStretchFactor(1, 2)
+        content_split.setSizes([420, 680])
+
+        lay.addWidget(content_split, 1)
+
+        self._staged_label = QLabel()
+        self._staged_label.setProperty("accent", True)
+        self._staged_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        lay.addWidget(self._staged_label)
 
         lbl = QLabel("Commit Message")
         lbl.setProperty("accent", True)
@@ -492,6 +619,10 @@ class _CommitDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
 
+        btn_refresh = QPushButton("Refresh")
+        btn_refresh.clicked.connect(self._refresh_status)
+        btn_row.addWidget(btn_refresh)
+
         btn_commit = QPushButton("Commit")
         btn_commit.setProperty("accent", True)
         btn_commit.clicked.connect(self._do_commit)
@@ -499,9 +630,43 @@ class _CommitDialog(QDialog):
 
         lay.addLayout(btn_row)
 
+        self._refresh_status()
         self._msg_edit.setFocus()
 
+    def _refresh_status(self):
+        self._file_status.refresh()
+        self._diff_viewer.clear()
+        self._update_staged_label()
+
+    def _update_staged_label(self):
+        count = self._file_status.staged_count()
+        self._staged_label.setText(f"Staged files: {count}")
+
+    def _on_status_changed(self):
+        self._update_staged_label()
+
+    def _on_file_selected(self, filepath: str, is_staged: bool):
+        try:
+            diff = git_ops.get_diff(self._repo, filepath, staged=is_staged)
+            if not diff.strip():
+                diff = "(no diff available)"
+            self._diff_viewer.show_diff(diff, title=filepath)
+        except Exception as e:
+            self._diff_viewer.show_diff(str(e), title="Error")
+
+    def _on_untracked_selected(self, filepath: str):
+        diff = git_ops.get_diff_for_untracked(self._repo, filepath)
+        self._diff_viewer.show_diff(diff, title=f"(new) {filepath}")
+
     def _do_commit(self):
+        if self._file_status.staged_count() == 0:
+            QMessageBox.information(
+                self,
+                "Nothing Staged",
+                "Stage some files first before committing.",
+            )
+            return
+
         msg = self._msg_edit.toPlainText().strip()
         if not msg:
             QMessageBox.warning(self, "Empty Message", "Please enter a commit message.")

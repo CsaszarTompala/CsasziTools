@@ -1,0 +1,1 @@
+# CsasziCompare widgets package

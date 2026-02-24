@@ -12,10 +12,10 @@ from typing import List, Tuple, NamedTuple
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QStyledItemDelegate, QStyle, QAbstractItemView, QLabel, QPushButton,
-    QHeaderView, QLineEdit,
+    QHeaderView, QLineEdit, QMenu,
 )
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QFont
-from PyQt6.QtCore import Qt, QRect, pyqtSignal, QSize
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QAction
+from PyQt6.QtCore import Qt, QRect, pyqtSignal, QSize, QTimer, QEvent
 
 from csaszigit import git_ops
 from csaszigit.themes import palette
@@ -231,6 +231,7 @@ class CommitLogPanel(QWidget):
     """Commit history panel with graph visualisation."""
 
     commit_selected = pyqtSignal(str)  # commit hash
+    compare_requested = pyqtSignal(str, str)  # two commit hashes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -253,27 +254,35 @@ class CommitLogPanel(QWidget):
 
         # Commit table
         self._tree = QTreeWidget()
-        self._tree.setHeaderLabels(["Graph", "Hash", "Message", "Author", "Date", "Refs"])
+        self._tree.setHeaderLabels(["Graph", "Refs", "Hash", "Message", "Author", "Date"])
         self._tree.setRootIsDecorated(False)
         self._tree.setAlternatingRowColors(True)
-        self._tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._tree.setUniformRowHeights(True)
         self._tree.setFont(QFont("Consolas", 10))
         self._tree.itemSelectionChanged.connect(self._on_selection)
+        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tree.customContextMenuRequested.connect(self._on_context_menu)
 
         header = self._tree.header()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self._tree.setColumnWidth(0, 120)
-        self._tree.setColumnWidth(1, 80)
-        self._tree.setColumnWidth(3, 130)
-        self._tree.setColumnWidth(4, 150)
-        self._tree.setColumnWidth(5, 160)
+        self._tree.setColumnWidth(0, LANE_WIDTH * 2)
+        self._tree.setColumnWidth(1, 180)
+        self._tree.setColumnWidth(2, 80)
+        self._tree.setColumnWidth(4, 130)
+        self._tree.setColumnWidth(5, 150)
+
+        self._tree.verticalScrollBar().valueChanged.connect(self._update_graph_column_width)
+        self._tree.verticalScrollBar().rangeChanged.connect(
+            lambda *_: self._update_graph_column_width()
+        )
+        self._tree.viewport().installEventFilter(self)
 
         # Graph delegate
         delegate = _GraphDelegate(lambda: self._graph_data, self._tree)
@@ -291,6 +300,7 @@ class CommitLogPanel(QWidget):
             self._commits = []
         self._graph_data = _build_graph_data(self._commits)
         self._populate()
+        QTimer.singleShot(0, self._update_graph_column_width)
 
     def _populate(self, filter_text: str = ""):
         self._tree.clear()
@@ -302,11 +312,11 @@ class CommitLogPanel(QWidget):
                     continue
             item = QTreeWidgetItem([
                 "",           # graph drawn by delegate
+                ci.refs,
                 ci.short_hash,
                 ci.message,
                 ci.author,
                 ci.date[:16],  # trim seconds/tz
-                ci.refs,
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, ci.hash)
             # Store original index for graph alignment
@@ -314,9 +324,11 @@ class CommitLogPanel(QWidget):
 
             # Colour refs
             if ci.refs:
-                item.setForeground(5, QColor(palette()["cyan"]))
+                item.setForeground(1, QColor(palette()["cyan"]))
 
             self._tree.addTopLevelItem(item)
+
+        self._update_graph_column_width()
 
     # -- slots -----------------------------------------------------------------
 
@@ -329,3 +341,70 @@ class CommitLogPanel(QWidget):
 
     def _apply_filter(self, text: str):
         self._populate(text.strip())
+
+    def _on_context_menu(self, pos):
+        """Right-click context menu — Compare is enabled when exactly 2 commits are selected."""
+        items = self._tree.selectedItems()
+        menu = QMenu(self)
+
+        act_compare = QAction("🔍 Compare", self)
+        act_compare.setEnabled(len(items) == 2)
+        act_compare.triggered.connect(self._on_compare)
+        menu.addAction(act_compare)
+
+        menu.exec(self._tree.viewport().mapToGlobal(pos))
+
+    def _on_compare(self):
+        items = self._tree.selectedItems()
+        if len(items) != 2:
+            return
+        h1 = items[0].data(0, Qt.ItemDataRole.UserRole)
+        h2 = items[1].data(0, Qt.ItemDataRole.UserRole)
+        if h1 and h2:
+            self.compare_requested.emit(h1, h2)
+
+    def eventFilter(self, obj, event):
+        if obj is self._tree.viewport() and event.type() in (
+            QEvent.Type.Resize,
+            QEvent.Type.Show,
+        ):
+            QTimer.singleShot(0, self._update_graph_column_width)
+        return super().eventFilter(obj, event)
+
+    def _visible_original_indexes(self) -> List[int]:
+        count = self._tree.topLevelItemCount()
+        if count == 0:
+            return []
+
+        viewport = self._tree.viewport()
+        top_row = self._tree.indexAt(viewport.rect().topLeft()).row()
+        bottom_row = self._tree.indexAt(viewport.rect().bottomLeft()).row()
+
+        if top_row < 0:
+            top_row = 0
+        if bottom_row < 0:
+            bottom_row = count - 1
+
+        visible: List[int] = []
+        for row in range(top_row, min(bottom_row, count - 1) + 1):
+            item = self._tree.topLevelItem(row)
+            if not item:
+                continue
+            orig_idx = item.data(0, Qt.ItemDataRole.UserRole + 1)
+            if isinstance(orig_idx, int):
+                visible.append(orig_idx)
+        return visible
+
+    def _update_graph_column_width(self):
+        visible = self._visible_original_indexes()
+        if not visible:
+            target = LANE_WIDTH * 2
+        else:
+            max_lanes = 1
+            for idx in visible:
+                if 0 <= idx < len(self._graph_data):
+                    max_lanes = max(max_lanes, self._graph_data[idx].total_lanes)
+            target = max((max_lanes + 1) * LANE_WIDTH, LANE_WIDTH * 2)
+
+        if self._tree.columnWidth(0) != target:
+            self._tree.setColumnWidth(0, target)

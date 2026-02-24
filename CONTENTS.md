@@ -3,6 +3,7 @@
 ## Top-level folders
 
 - [Common](Common)
+- [CsasziCompare](CsasziCompare)
 - [CsasziGit](CsasziGit)
 - [Mini_projects](Mini_projects)
 - [MoneySplitter](MoneySplitter)
@@ -14,6 +15,7 @@
 ## Tool README links
 
 - [Common Menu System README](Common/Menu/README.md)
+- [CsasziCompare README](CsasziCompare/README.md)
 - [CsasziGit README](CsasziGit/README.md)
 - [Mini_projects / Unix Timestamper README](Mini_projects/Unix_timestamper/README.md)
 - [Money Splitter README](MoneySplitter/Python/README.md)
@@ -34,7 +36,8 @@
 - [Unix Timestamper feature documentation](Mini_projects/Unix_timestamper/FEATURE_DOCUMENTATION.md)
 
 ### Standalone tools
-- [CsasziGit](CsasziGit) — PyQt6 Git GUI with Dracula theme and AI-assisted commands
+- [CsasziCompare](CsasziCompare) — PyQt6 file/directory/Git commit comparison tool with side-by-side diff, character-level highlighting, 3-way merge/rebase, and Dracula/Dark/Bright themes
+- [CsasziGit](CsasziGit) — PyQt6 Git GUI with fully dockable panels, folder browser, Dracula theme, AI-assisted commands, integrated Git terminal, and CsasziCompare integration
 - [Money Splitter](MoneySplitter/Python) — PyQt5 trip-expense splitter
 - [Mouse and Keyboard Replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)

@@ -265,8 +265,16 @@ def pull(repo: str, remote: str = "origin", branch: str = "") -> str:
     return out
 
 
-def fetch_all(repo: str, remote: str = "origin") -> str:
+def fetch(repo: str, remote: str = "origin") -> str:
     r = run_git(repo, "fetch", remote, "--prune", check=False)
+    out = (r.stdout + "\n" + r.stderr).strip()
+    if r.returncode != 0:
+        raise GitError(out)
+    return out
+
+
+def fetch_all(repo: str) -> str:
+    r = run_git(repo, "fetch", "--all", "--prune", check=False)
     out = (r.stdout + "\n" + r.stderr).strip()
     if r.returncode != 0:
         raise GitError(out)

@@ -15,6 +15,8 @@ For every code or file change in this repository:
 ## Scope mapping
 
 - Changes under `Common/Menu/` -> review `Common/Menu/README.md` and `CONTENTS.md`
+- Changes under `CsasziCompare/` -> review `CsasziCompare/README.md` and `CONTENTS.md`
+- Changes under `CsasziGit/` -> review `CsasziGit/README.md` and `CONTENTS.md`
 - Changes under `Mini_projects/Unix_timestamper/` -> review `Mini_projects/Unix_timestamper/README.md` and `CONTENTS.md`
 - Changes under `Mouse_and_keyboard_replayer/` -> review `Mouse_and_keyboard_replayer/README.md` and `CONTENTS.md`
 - Changes under `OpenJenkins/` -> review `OpenJenkins/README.md` and `CONTENTS.md`

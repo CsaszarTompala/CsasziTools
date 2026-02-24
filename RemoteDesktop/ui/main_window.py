@@ -40,6 +40,9 @@ class RemoteDesktopApp(tk.Tk):
         # Connections
         self.connections = load_connections()
 
+        # Per-connection "all displays" checkbox state
+        self._multimon_vars: list[tk.BooleanVar] = []
+
         # Build UI
         self._build_menu_bar()
         self._create_widgets()
@@ -224,13 +227,18 @@ class RemoteDesktopApp(tk.Tk):
         for w in self.scrollable_frame.winfo_children():
             w.destroy()
 
+        # Rebuild multimon vars to match current connection count
+        self._multimon_vars = [
+            tk.BooleanVar(value=False) for _ in self.connections
+        ]
+
         for idx, conn in enumerate(self.connections):
             row = ttk.Frame(self.scrollable_frame)
             row.pack(fill=tk.X, pady=3)
 
             ttk.Button(
                 row, text=f"🖥️ {conn['name']}",
-                command=lambda c=conn: self._connect(c),
+                command=lambda i=idx, c=conn: self._connect(c, i),
             ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
             ttk.Button(
@@ -243,14 +251,24 @@ class RemoteDesktopApp(tk.Tk):
                 command=lambda i=idx: self._delete_connection(i),
             ).pack(side=tk.LEFT, padx=(2, 0))
 
+            ttk.Checkbutton(
+                row, text="All displays",
+                variable=self._multimon_vars[idx],
+            ).pack(side=tk.LEFT, padx=(4, 0))
+
         self.scrollable_frame.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     # ==================================================================
     # Connection actions
     # ==================================================================
-    def _connect(self, connection: dict) -> None:
+    def _connect(self, connection: dict, index: int = 0) -> None:
         computer = connection["computer"]
+        multimon = (
+            self._multimon_vars[index].get()
+            if index < len(self._multimon_vars)
+            else False
+        )
         if not store_credentials(computer, connection["username"], connection["password"]):
             messagebox.showerror(
                 "Error",
@@ -258,7 +276,7 @@ class RemoteDesktopApp(tk.Tk):
                 parent=self,
             )
             return
-        if not connect_to_remote_desktop(computer):
+        if not connect_to_remote_desktop(computer, multimon=multimon):
             messagebox.showerror(
                 "Error",
                 f"Failed to launch Remote Desktop for {connection['name']}.",

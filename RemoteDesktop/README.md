@@ -15,6 +15,7 @@ Remote Desktop Connector provides a convenient command-line and GUI interface fo
 - ⌨️ Command-line interface for automation
 - 🔌 Multiple connection profiles stored
 - 🚀 Quick launch shortcuts for frequently used connections
+- 🖵 **All Displays** checkbox — tick it next to any connection to span the RDP session across all monitors (`/multimon`)
 
 ## Installation
 
