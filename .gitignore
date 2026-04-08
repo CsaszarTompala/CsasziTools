@@ -81,6 +81,9 @@ xref-*.html
 Mouse_and_keyboard_replayer/recordings/*.json
 Mouse_and_keyboard_replayer/recordings/*.csv
 
+# ----- Config files with secrets -----
+config.json
+
 # ----- Temporary / Log files -----
 *.log
 *.tmp

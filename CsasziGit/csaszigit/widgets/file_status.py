@@ -10,6 +10,7 @@ and stage.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QLabel, QAbstractItemView, QMenu, QHeaderView,
+    QMessageBox,
 )
 from PyQt6.QtGui import QColor, QFont, QAction
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -221,16 +222,16 @@ class FileStatusPanel(QWidget):
     def _stage_all(self):
         try:
             git_ops.stage_all(self._repo)
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(self, "Stage All Error", str(e))
         self.refresh()
         self.status_changed.emit()
 
     def _unstage_all(self):
         try:
             git_ops.unstage_all(self._repo)
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(self, "Unstage All Error", str(e))
         self.refresh()
         self.status_changed.emit()
 

@@ -1,0 +1,15 @@
+{
+    "input_base_path": "C:\\Jenkins_workspace\\ws\\ARS620DP28-CQG5-EFL\\input",
+    "debugger_config_path": "D:\\ARS620DP28_DevEnv\\DebugScripts\\TAF\\tests\\integration\\Application\\TRACE32\\TC_AUTO_Programming_Load_Project_Config_ars620dp28f.txt",
+    "debugger_start_cmd": "D:\\ARS620DP28_DevEnv\\DebugScripts\\Run_LauterbachToolBoxEnvironment_awr2944_ars620dp28f_autoflashing.cmd",
+    "flash_files": {
+        "fbl": "fbl\\out\\ARS620DP28_FBL.mot",
+        "hsm": "hsm\\out\\ARS620DP28_HSM.mot",
+        "sbl": "sbl\\out\\RAD6XX_SBL_B2.mot",
+        "seckeys": "seckeys\\out\\SECKEYS\\B2\\SECKEYS.mot",
+        "appl": "appl\\out\\*_supermot.mot"
+    },
+    "nvm_clear": "appl\\out\\NvMHsmClear.mot",
+    "max_flash_attempts": 2,
+    "pass_verdict": "<Verdict:> \"PASS\""
+}
