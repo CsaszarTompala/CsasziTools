@@ -640,7 +640,7 @@ APPS: list[Application] = [
     Application(
         key="doublecmd",
         name="Double Commander",
-        winget_id="Alexx2000.DoubleCommander",
+        winget_id="alexx2000.DoubleCommander",
         configs=[
             ConfigCopy(
                 source="doublecmd",
