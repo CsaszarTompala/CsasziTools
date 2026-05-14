@@ -28,7 +28,9 @@ REM Build the executable
 cd /d "%~dp0"
 pyinstaller --noconfirm --clean --onefile --windowed ^
     --name "RemoteDesktopConnector" ^
+    --icon "logo_RD.ico" ^
     --add-data "logo_RD.png;." ^
+    --add-data "logo_RD.ico;." ^
     --add-data "RemoteDesktopConnector_logo.png;." ^
     --paths "%~dp0" ^
     --hidden-import ui --hidden-import logic --hidden-import data ^

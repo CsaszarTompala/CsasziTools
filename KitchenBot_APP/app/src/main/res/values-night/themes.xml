@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KitchenBot" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#FFAB40</item>
+        <item name="colorOnPrimary">#1B1B1B</item>
+        <item name="colorPrimaryContainer">#3E2723</item>
+        <item name="colorSecondary">#81C784</item>
+    </style>
+</resources>

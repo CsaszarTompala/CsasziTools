@@ -54,6 +54,7 @@ fun ResultsTab(viewModel: TripViewModel) {
     val balances by viewModel.balances.collectAsState()
     val settlements by viewModel.settlements.collectAsState()
     val isDark = isSystemInDarkTheme()
+    val settledCount = trip.expenses.count { it.settled }
 
     if (trip.expenses.isEmpty()) {
         Box(
@@ -117,6 +118,38 @@ fun ResultsTab(viewModel: TripViewModel) {
                         options = trip.currencies,
                         onSelect = { viewModel.setResultCurrency(it) }
                     )
+                }
+            }
+        }
+
+        // Settled expenses info
+        if (settledCount > 0) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "$settledCount expense${if (settledCount > 1) "s" else ""} settled — excluded from balances below",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
                 }
             }
         }

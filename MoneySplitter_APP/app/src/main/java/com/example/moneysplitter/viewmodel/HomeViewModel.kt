@@ -24,8 +24,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _trips.value = repository.listTrips()
     }
 
-    fun createTrip(name: String): String {
-        val trip = TripData(name = name)
+    fun createTrip(name: String, startDate: String? = null, endDate: String? = null): String {
+        val trip = TripData(name = name, startDate = startDate, endDate = endDate)
         val fileName = repository.generateFileName(name)
         repository.saveTrip(trip, fileName)
         loadTrips()

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KitchenBot</string>
+    <string name="back">Back</string>
+
+    <!-- Home Screen -->
+    <string name="home_title">KitchenBot</string>
+    <string name="menu_recipe_book">Recipe Book</string>
+    <string name="menu_shopping_list">Shopping List</string>
+    <string name="menu_home_inventory">What I Have\nat Home</string>
+    <string name="menu_cook_from_home">Cook from\nWhat I Have</string>
+
+    <!-- Recipe Book -->
+    <string name="recipe_create_title">✨ Create Recipe with AI</string>
+    <string name="recipe_describe_hint">Describe your recipe idea…</string>
+    <string name="recipe_ai_creating">🧑‍🍳 AI is creating your recipe…</string>
+    <string name="recipe_describe_heading">Describe what you\'d like to cook</string>
+    <string name="recipe_describe_example">e.g. \"A creamy mushroom risotto for 4 people\"\nor \"Something quick with chicken and rice\"</string>
+    <string name="recipe_book_title">📖 Recipe Book</string>
+    <string name="recipe_new">New Recipe</string>
+    <string name="recipe_search_hint">Search recipes…</string>
+    <string name="recipe_empty_title">No recipes yet</string>
+    <string name="recipe_empty_subtitle">Tap + to create your first AI-powered recipe</string>
+    <string name="recipe_price_label">Price:</string>
+    <string name="recipe_filter_all">All</string>
+    <string name="recipe_tags_label">Tags:</string>
+    <string name="recipe_show_archived">Show Archived</string>
+    <string name="recipe_unnamed">Unnamed Recipe</string>
+    <string name="recipe_card_info">%1$d ingredients · %2$d steps</string>
+    <string name="recipe_archived_badge">🗄️ Archived</string>
+    <string name="recipe_delete_title">Delete Recipe?</string>
+    <string name="recipe_delete_body">This cannot be undone.</string>
+    <string name="recipe_delete_confirm">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="recipe_edit_title">✏️ Modify Recipe</string>
+    <string name="recipe_diff_title">📝 Review Changes</string>
+    <string name="recipe_fallback_title">Recipe</string>
+    <string name="recipe_undo_changes">↩️ Undo Changes</string>
+    <string name="recipe_keep_changes">✅ Keep Changes</string>
+    <string name="recipe_ai_modifying">AI is modifying…</string>
+    <string name="recipe_ai_modify_hint">Ask AI to modify…</string>
+    <string name="recipe_save">💾 Save Recipe</string>
+    <string name="recipe_name_hint">Name this recipe…</string>
+    <string name="recipe_modify_btn">✏️ Modify</string>
+    <string name="recipe_save_btn">💾 Save</string>
+    <string name="recipe_to_shopping">🛒 To Shopping List</string>
+    <string name="recipe_ingredients_title">🧾 Ingredients</string>
+    <string name="recipe_select_all">Select All</string>
+    <string name="recipe_steps_title">👩‍🍳 Steps</string>
+    <string name="recipe_tags_title">🏷️ Tags</string>
+    <string name="recipe_allergens_title">⚠️ Allergens</string>
+
+    <!-- Shopping List -->
+    <string name="shopping_title">🛒 Shopping List</string>
+    <string name="shopping_add_hint">Add item…</string>
+    <string name="shopping_remind_me">💡 Remind Me</string>
+    <string name="shopping_purchased">✅ I Purchased</string>
+    <string name="shopping_empty_title">Shopping list is empty</string>
+    <string name="shopping_empty_subtitle">Add items below or tap 💡 Remind Me</string>
+    <string name="shopping_no_suggestions">No suggestions yet. Keep using the app!</string>
+    <string name="done">Done</string>
+    <string name="shopping_store_sort">🏪 Sort by Store Layout</string>
+    <string name="close">Close</string>
+
+    <!-- Home Inventory -->
+    <string name="inventory_title">🏠 What I Have at Home</string>
+    <string name="inventory_add_item">Add Item</string>
+    <string name="inventory_empty_title">Nothing at home yet</string>
+    <string name="inventory_empty_subtitle">Items will appear here after purchasing</string>
+    <string name="inventory_search_hint">🔍 Search…</string>
+    <string name="inventory_search_empty">No results found</string>
+    <string name="inventory_old_badge">⏰ Old</string>
+    <string name="inventory_mark_fresh">Mark Fresh</string>
+    <string name="inventory_mark_old">Mark Old</string>
+    <string name="amount_label">Amount</string>
+    <string name="unit_label">Unit</string>
+    <string name="inventory_add_title">➕ Add Item</string>
+    <string name="inventory_item_name">Item name</string>
+    <string name="category_label">Category:</string>
+    <string name="add">Add</string>
+    <string name="inventory_pending_title">📦 Purchased Items — Set Amounts</string>
+    <string name="custom_label">Custom</string>
+    <string name="inventory_proceed">✅ Proceed</string>
+    <string name="inventory_skip_item">Skip</string>
+    <string name="later">Later</string>
+    <string name="pieces">pieces</string>
+
+    <!-- Cook From Home -->
+    <string name="cook_title">👨‍🍳 Cook from What I Have</string>
+    <string name="cook_items_at_home">🏠 You have %1$d items at home</string>
+    <string name="cook_old_items_warning">⏰ %1$d items marked as old — use them first!</string>
+    <string name="cook_extra_title">🛒 Extra ingredients allowed</string>
+    <string name="cook_extra_none">None — only what\'s at home</string>
+    <string name="cook_extra_few">A few extras</string>
+    <string name="cook_extra_some">Some extras OK</string>
+    <string name="cook_extra_lots">Lots of extras OK</string>
+    <string name="cook_prioritize_fridge">⏰ Prioritize emptying fridge</string>
+    <string name="cook_prioritize_subtitle">Use old items first to avoid waste</string>
+    <string name="cook_vegetarian">🥬 Vegetarian</string>
+    <string name="cook_meat_type">🥩 Meat Type</string>
+    <string name="cook_any">Any</string>
+    <string name="cook_exclude_allergens">⚠️ Exclude Allergens</string>
+    <string name="cook_allergen_gluten">Gluten</string>
+    <string name="cook_allergen_dairy">Dairy</string>
+    <string name="cook_allergen_nuts">Nuts</string>
+    <string name="cook_allergen_eggs">Eggs</string>
+    <string name="cook_allergen_soy">Soy</string>
+    <string name="cook_allergen_shellfish">Shellfish</string>
+    <string name="cook_dish_type">🍽️ Dish Type</string>
+    <string name="cook_ai_thinking">AI is thinking…</string>
+    <string name="cook_generate">🔮 Generate Recipe Ideas</string>
+    <string name="cook_suggestions_title">Recipe Suggestions</string>
+
+    <!-- Settings -->
+    <string name="settings_title">⚙️ Settings</string>
+    <string name="settings_api_key_title">OpenAI API Key</string>
+    <string name="settings_api_key_desc">Required for AI-powered features: recipe generation, voice commands, receipt scanning, and cooking suggestions.</string>
+    <string name="settings_api_key_label">API Key</string>
+    <string name="settings_api_key_placeholder">sk-…</string>
+    <string name="settings_saved">✅ Saved!</string>
+    <string name="settings_save_api_key">💾 Save API Key</string>
+    <string name="settings_about_title">ℹ️ About KitchenBot</string>
+    <string name="settings_about_body">Version 1.0\nYour AI-powered kitchen assistant.</string>
+    <string name="settings_language_title">🌐 Language</string>
+    <string name="settings_language_hungarian">Magyar</string>
+    <string name="settings_language_english">English</string>
+
+    <!-- API Key Gate -->
+    <string name="gate_title">Welcome to KitchenBot</string>
+    <string name="gate_description">This app uses AI to help you cook. Please enter your OpenAI API key to get started.</string>
+    <string name="gate_api_key_label">OpenAI API Key</string>
+    <string name="gate_api_key_placeholder">sk-…</string>
+    <string name="gate_error">Please enter a valid OpenAI API key (starts with sk-)</string>
+    <string name="gate_continue">Save &amp; Continue</string>
+</resources>

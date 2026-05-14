@@ -1,5 +1,6 @@
 package com.example.moneysplitter.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,18 +17,25 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +47,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.moneysplitter.data.Expense
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -52,9 +63,14 @@ fun AddExpenseSheet(
     onSave: (Expense) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isoFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val displayFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
 
-    var description by remember {
-        mutableStateOf(existingExpense?.description ?: "")
+    var expenseName by remember {
+        mutableStateOf(existingExpense?.let { it.name ?: it.description } ?: "")
+    }
+    var notes by remember {
+        mutableStateOf(existingExpense?.notes ?: "")
     }
     var amountText by remember {
         mutableStateOf(
@@ -74,6 +90,10 @@ fun AddExpenseSheet(
     var selectedSplit by remember {
         mutableStateOf(existingExpense?.splitAmong?.toSet() ?: people.toSet())
     }
+    var selectedDate by remember {
+        mutableStateOf(existingExpense?.date ?: isoFormat.format(Date()))
+    }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -93,13 +113,24 @@ fun AddExpenseSheet(
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            // Description
+            // Name
             OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Description (optional)") },
+                value = expenseName,
+                onValueChange = { expenseName = it },
+                label = { Text("Name (optional)") },
                 placeholder = { Text("e.g. Dinner, Taxi, Groceries") },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = { Icon(Icons.Default.Label, contentDescription = null) }
+            )
+
+            // Description / Notes
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Description (optional)") },
+                placeholder = { Text("Extra details about this expense") },
+                maxLines = 3,
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) }
             )
@@ -114,6 +145,30 @@ fun AddExpenseSheet(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) }
+            )
+
+            // Date (optional)
+            OutlinedTextField(
+                value = selectedDate?.let {
+                    try { displayFormat.format(isoFormat.parse(it)!!) } catch (_: Exception) { it }
+                } ?: "",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Date (optional)") },
+                placeholder = { Text("Tap to pick a date") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true },
+                leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                trailingIcon = {
+                    if (selectedDate != null) {
+                        IconButton(onClick = { selectedDate = null }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear date")
+                        }
+                    }
+                },
+                enabled = false // Disable keyboard, use click to open picker
             )
 
             // Currency selector
@@ -247,7 +302,11 @@ fun AddExpenseSheet(
                                     currency = selectedCurrency,
                                     paidBy = selectedPayer,
                                     splitAmong = selectedSplit.toList(),
-                                    description = description.trim()
+                                    description = expenseName.trim(),
+                                    name = expenseName.trim(),
+                                    notes = notes.trim().ifBlank { null },
+                                    date = selectedDate,
+                                    settled = existingExpense?.settled ?: false
                                 )
                             )
                         }
@@ -258,6 +317,31 @@ fun AddExpenseSheet(
                     Text(if (existingExpense != null) "Update" else "Add")
                 }
             }
+        }
+    }
+
+    // Date picker dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate?.let {
+                try { isoFormat.parse(it)?.time } catch (_: Exception) { null }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        selectedDate = isoFormat.format(Date(it))
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

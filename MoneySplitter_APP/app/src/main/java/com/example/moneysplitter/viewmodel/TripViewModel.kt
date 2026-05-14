@@ -1,6 +1,7 @@
 package com.example.moneysplitter.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.moneysplitter.data.Expense
@@ -8,11 +9,13 @@ import com.example.moneysplitter.data.Settlement
 import com.example.moneysplitter.data.TripData
 import com.example.moneysplitter.data.TripRepository
 import com.example.moneysplitter.logic.Calculator
+import com.example.moneysplitter.logic.PdfExporter
 import com.example.moneysplitter.logic.RateFetcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 class TripViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -216,6 +219,26 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     fun renameTripName(newName: String) {
         if (newName.isBlank()) return
         update { it.copy(name = newName.trim()) }
+    }
+
+    fun updateTripInfo(name: String, startDate: String?, endDate: String?) {
+        update { it.copy(name = name.trim().ifBlank { it.name }, startDate = startDate, endDate = endDate) }
+    }
+
+    // --- Expense settled toggle ---
+
+    fun toggleExpenseSettled(expenseId: String) {
+        update { trip ->
+            trip.copy(expenses = trip.expenses.map {
+                if (it.id == expenseId) it.copy(settled = !it.settled) else it
+            })
+        }
+    }
+
+    // --- PDF Export ---
+
+    fun generatePdf(context: Context): File {
+        return PdfExporter.export(context, _trip.value, _balances.value, _settlements.value)
     }
 
     private fun recalculate() {

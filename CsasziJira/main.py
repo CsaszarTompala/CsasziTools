@@ -44,11 +44,22 @@ def load_config():
         print(f"ERROR: config.json is not valid JSON")
         sys.exit(1)
 
-    required = ["jira_url", "email", "api_token"]
+    required = ["jira_url", "email"]
     for key in required:
         if not cfg.get(key) or cfg[key].startswith("YOUR_"):
             print(f"ERROR: '{key}' is not configured in config.json")
             sys.exit(1)
+
+    # Resolve API token: env var JIRA_TOKEN > config.json > prompt
+    token = os.environ.get("JIRA_TOKEN")
+    if token:
+        cfg["api_token"] = token
+    elif not cfg.get("api_token") or cfg["api_token"].startswith("YOUR_"):
+        cfg["api_token"] = input("JIRA_TOKEN not found. Enter your Jira API token: ").strip()
+        if not cfg["api_token"]:
+            print("ERROR: No API token provided.")
+            sys.exit(1)
+
     return cfg
 
 
@@ -116,9 +127,11 @@ class JiraClient:
         data = self._get(f"/issue/{issue_key}/transitions")
         return data.get("transitions", [])
 
-    def transition_issue(self, issue_key, transition_id):
+    def transition_issue(self, issue_key, transition_id, extra_fields=None):
         """Execute a transition on *issue_key*."""
         payload = {"transition": {"id": str(transition_id)}}
+        if extra_fields:
+            payload["fields"] = extra_fields
         self._post(f"/issue/{issue_key}/transitions", payload)
 
     def set_fix_version(self, issue_key, version_name):
@@ -194,9 +207,8 @@ def find_done_transition(transitions, target_name="Done"):
             return t
 
     # fallback: any transition landing in 'done' category
-    # Skip "Canceled"/"Cancelled" — they share the 'done' category but are the
-    # wrong terminal state and typically require a Cancel Reason field.
-    skip_names = {"canceled", "cancelled"}
+    # Skip transitions that land in 'done' but are NOT the desired terminal state.
+    skip_names = {"canceled", "cancelled", "duplicate"}
     for t in transitions:
         if t["name"].lower() in skip_names:
             continue
@@ -212,7 +224,8 @@ def find_done_transition(transitions, target_name="Done"):
 # Processor
 # ──────────────────────────────────────────────────────────────────────────────
 
-def process_issue(client, issue_key, fix_version, done_name, dry_run):
+def process_issue(client, issue_key, fix_version, done_name, dry_run,
+                   story_points=None, workflow_fields=None):
     """
     Set fix version and transition a single issue to Done.
     Returns True on success, False on failure.
@@ -260,6 +273,21 @@ def process_issue(client, issue_key, fix_version, done_name, dry_run):
             print(f"    ✗ Failed to check DoD items: {exc}")
             return False
 
+    # workflow_fields: maps transition name (lowercase) -> extra fields dict
+    if workflow_fields is None:
+        workflow_fields = {}
+
+    # Build extra fields for transitions (e.g. required Story Points)
+    base_transition_fields = {}
+    if story_points is not None:
+        base_transition_fields["customfield_10002"] = story_points
+
+    def fields_for(transition_name):
+        """Merge base fields with any workflow-specific fields for this transition."""
+        extra = dict(base_transition_fields)
+        extra.update(workflow_fields.get(transition_name.lower(), {}))
+        return extra or None
+
     # Transition to Done (may require stepping through intermediate states)
     MAX_STEPS = 10  # safety limit to avoid infinite loops
     for step in range(MAX_STEPS):
@@ -270,23 +298,46 @@ def process_issue(client, issue_key, fix_version, done_name, dry_run):
             if dry_run:
                 print(f"    [DRY-RUN] Would transition via '{done_t['name']}' (id={done_t['id']})")
             else:
+                extra = fields_for(done_t["name"])
                 try:
-                    client.transition_issue(issue_key, done_t["id"])
+                    client.transition_issue(issue_key, done_t["id"], extra)
                     print(f"    ✓ Transitioned via '{done_t['name']}'")
                 except requests.HTTPError as exc:
-                    print(f"    ✗ Transition failed: {exc}")
-                    if exc.response is not None:
+                    # Retry: strip base fields (e.g. story points) that may not be on
+                    # this screen, but keep workflow-specific required fields.
+                    if exc.response is not None and exc.response.status_code == 400 and extra:
+                        wf_only = workflow_fields.get(done_t["name"].lower()) or None
                         try:
-                            print(f"      Response: {exc.response.text}")
-                        except Exception:
-                            pass
-                    return False
+                            client.transition_issue(issue_key, done_t["id"], wf_only)
+                            print(f"    ✓ Transitioned via '{done_t['name']}' (workflow fields only)")
+                        except requests.HTTPError as exc2:
+                            # Last resort: no extra fields at all
+                            try:
+                                client.transition_issue(issue_key, done_t["id"], None)
+                                print(f"    ✓ Transitioned via '{done_t['name']}' (no extra fields)")
+                            except requests.HTTPError as exc3:
+                                print(f"    ✗ Transition failed: {exc3}")
+                                if exc3.response is not None:
+                                    try:
+                                        print(f"      Response: {exc3.response.text}")
+                                    except Exception:
+                                        pass
+                                return False
+                    else:
+                        print(f"    ✗ Transition failed: {exc}")
+                        if exc.response is not None:
+                            try:
+                                print(f"      Response: {exc.response.text}")
+                            except Exception:
+                                pass
+                        return False
             return True
 
         # No direct Done transition — try to advance through workflow
-        # Prefer: In Progress > In Verification > any other forward step
-        preferred_order = ["in progress", "in verification", "in review",
-                           "ready for review", "resolved"]
+        # Prefer known forward steps, including ARS/automotive workflow states
+        preferred_order = ["realized", "to be verified", "06-to be verified",
+                           "07-realized", "in progress", "in verification",
+                           "in review", "ready for review", "resolved"]
         next_t = None
         for pref in preferred_order:
             for t in transitions:
@@ -296,11 +347,12 @@ def process_issue(client, issue_key, fix_version, done_name, dry_run):
             if next_t:
                 break
 
-        # Last resort: pick any transition that isn't backward to "New"/"Planned"/"Open"
+        # Last resort: pick any transition that isn't backward or a terminal wrong state
         if not next_t:
-            skip = {"new", "planned", "open", "backlog", "to do"}
+            skip = {"new", "planned", "open", "backlog", "to do",
+                    "on hold", "canceled", "cancelled", "duplicate"}
             for t in transitions:
-                if t["name"].lower() not in skip:
+                if t["name"].lower() not in skip and not t["name"].lower().startswith("01-"):
                     next_t = t
                     break
 
@@ -314,24 +366,45 @@ def process_issue(client, issue_key, fix_version, done_name, dry_run):
             print(f"    [DRY-RUN] Would step via '{next_t['name']}' (id={next_t['id']}) → then continue toward Done")
             return True
         else:
+            step_extra = fields_for(next_t["name"])
             try:
-                client.transition_issue(issue_key, next_t["id"])
+                client.transition_issue(issue_key, next_t["id"], step_extra)
                 print(f"    → Stepped via '{next_t['name']}'")
             except requests.HTTPError as exc:
-                print(f"    ✗ Intermediate transition '{next_t['name']}' failed: {exc}")
-                if exc.response is not None:
+                if exc.response is not None and exc.response.status_code == 400 and step_extra:
+                    wf_only = workflow_fields.get(next_t["name"].lower()) or None
                     try:
-                        print(f"      Response: {exc.response.text}")
-                    except Exception:
-                        pass
-                return False
+                        client.transition_issue(issue_key, next_t["id"], wf_only)
+                        print(f"    → Stepped via '{next_t['name']}' (workflow fields only)")
+                    except requests.HTTPError as exc2:
+                        # Last resort: no extra fields
+                        try:
+                            client.transition_issue(issue_key, next_t["id"], None)
+                            print(f"    → Stepped via '{next_t['name']}' (no extra fields)")
+                        except requests.HTTPError as exc3:
+                            print(f"    ✗ Intermediate transition '{next_t['name']}' failed: {exc3}")
+                            if exc3.response is not None:
+                                try:
+                                    print(f"      Response: {exc3.response.text}")
+                                except Exception:
+                                    pass
+                            return False
+                else:
+                    print(f"    ✗ Intermediate transition '{next_t['name']}' failed: {exc}")
+                    if exc.response is not None:
+                        try:
+                            print(f"      Response: {exc.response.text}")
+                        except Exception:
+                            pass
+                    return False
             time.sleep(0.3)  # small delay between transitions
 
     print(f"    ✗ Could not reach Done within {MAX_STEPS} steps")
     return False
 
 
-def process_story(client, project, story_number, fix_version, done_name, dry_run):
+def process_story(client, project, story_number, fix_version, done_name,
+                   dry_run, story_points=None, workflow_fields=None):
     """Process a single story: close subtasks first, then parent."""
     issue_key = f"{project}-{story_number}"
     print(f"\n{'='*60}")
@@ -357,14 +430,16 @@ def process_story(client, project, story_number, fix_version, done_name, dry_run
         print(f"\n  --- Subtasks ---")
         for st in subtasks:
             st_key = st["key"]
-            ok = process_issue(client, st_key, fix_version, done_name, dry_run)
+            ok = process_issue(client, st_key, fix_version, done_name, dry_run,
+                               story_points=story_points, workflow_fields=workflow_fields)
             if not ok:
                 all_ok = False
                 print(f"    ⚠ Subtask {st_key} could not be completed.")
 
     # Step 2: Process the parent story
     print(f"\n  --- Parent Story ---")
-    ok = process_issue(client, issue_key, fix_version, done_name, dry_run)
+    ok = process_issue(client, issue_key, fix_version, done_name, dry_run,
+                       story_points=story_points, workflow_fields=workflow_fields)
     if not ok:
         all_ok = False
 
@@ -397,6 +472,7 @@ def main():
     fix_version = args.fix_version or cfg.get("fix_version", "")
     done_name = cfg.get("done_transition_name", "Done")
     dry_run = args.dry_run if args.dry_run is not None else cfg.get("dry_run", False)
+    story_points = cfg.get("story_points", None)
 
     # Load stories
     stories_path = args.stories or os.path.join(os.path.dirname(__file__), "stories.json")
@@ -470,9 +546,18 @@ def main():
         sys.exit(1)
 
     # Process stories
+    # Per-transition required fields for this project's workflow
+    workflow_fields = {
+        "06-to be verified": {
+            "customfield_22243": [{"id": "38809"}],  # Software Integration Test
+            "customfield_22026": fix_version or "N/A",
+        },
+    }
     results = {}
     for num in story_numbers:
-        ok = process_story(client, project, num, fix_version, done_name, dry_run)
+        ok = process_story(client, project, num, fix_version, done_name,
+                           dry_run, story_points=story_points,
+                           workflow_fields=workflow_fields)
         results[f"{project}-{num}"] = "OK" if ok else "FAILED"
         time.sleep(0.5)  # rate-limit courtesy
 

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KitchenBot</string>
+    <string name="back">Vissza</string>
+
+    <!-- Home Screen -->
+    <string name="home_title">KitchenBot</string>
+    <string name="menu_recipe_book">Receptkönyv</string>
+    <string name="menu_shopping_list">Bevásárlólista</string>
+    <string name="menu_home_inventory">Ami otthon\nvan</string>
+    <string name="menu_cook_from_home">Főzés abból\nami van</string>
+
+    <!-- Recipe Book -->
+    <string name="recipe_create_title">✨ Recept készítése AI-val</string>
+    <string name="recipe_describe_hint">Írd le a recept ötleted…</string>
+    <string name="recipe_ai_creating">🧑‍🍳 AI készíti a receptet…</string>
+    <string name="recipe_describe_heading">Írd le, mit szeretnél főzni</string>
+    <string name="recipe_describe_example">pl. \"Krémes gombás rizottó 4 főre\"\nvagy \"Valami gyors csirkével és rizzsel\"</string>
+    <string name="recipe_book_title">📖 Receptkönyv</string>
+    <string name="recipe_new">Új recept</string>
+    <string name="recipe_search_hint">Receptek keresése…</string>
+    <string name="recipe_empty_title">Még nincs recept</string>
+    <string name="recipe_empty_subtitle">Nyomj a + gombra az első AI recept létrehozásához</string>
+    <string name="recipe_price_label">Ár:</string>
+    <string name="recipe_filter_all">Mind</string>
+    <string name="recipe_tags_label">Címkék:</string>
+    <string name="recipe_show_archived">Archivált mutatása</string>
+    <string name="recipe_unnamed">Névtelen recept</string>
+    <string name="recipe_card_info">%1$d hozzávaló · %2$d lépés</string>
+    <string name="recipe_archived_badge">🗄️ Archivált</string>
+    <string name="recipe_delete_title">Recept törlése?</string>
+    <string name="recipe_delete_body">Ez nem vonható vissza.</string>
+    <string name="recipe_delete_confirm">Törlés</string>
+    <string name="cancel">Mégse</string>
+    <string name="recipe_edit_title">✏️ Recept módosítása</string>
+    <string name="recipe_diff_title">📝 Változások áttekintése</string>
+    <string name="recipe_fallback_title">Recept</string>
+    <string name="recipe_undo_changes">↩️ Változások visszavonása</string>
+    <string name="recipe_keep_changes">✅ Változások megtartása</string>
+    <string name="recipe_ai_modifying">AI módosít…</string>
+    <string name="recipe_ai_modify_hint">Kérd az AI-t a módosításra…</string>
+    <string name="recipe_save">💾 Recept mentése</string>
+    <string name="recipe_name_hint">Nevezd el a receptet…</string>
+    <string name="recipe_modify_btn">✏️ Módosítás</string>
+    <string name="recipe_save_btn">💾 Mentés</string>
+    <string name="recipe_to_shopping">🛒 Bevásárlólistára</string>
+    <string name="recipe_ingredients_title">🧾 Hozzávalók</string>
+    <string name="recipe_select_all">Összes kijelölése</string>
+    <string name="recipe_steps_title">👩‍🍳 Lépések</string>
+    <string name="recipe_tags_title">🏷️ Címkék</string>
+    <string name="recipe_allergens_title">⚠️ Allergének</string>
+
+    <!-- Shopping List -->
+    <string name="shopping_title">🛒 Bevásárlólista</string>
+    <string name="shopping_add_hint">Elem hozzáadása…</string>
+    <string name="shopping_remind_me">💡 Emlékeztess</string>
+    <string name="shopping_purchased">✅ Megvettem</string>
+    <string name="shopping_empty_title">A bevásárlólista üres</string>
+    <string name="shopping_empty_subtitle">Adj hozzá elemeket, vagy nyomd meg a 💡 Emlékeztess gombot</string>
+    <string name="shopping_no_suggestions">Még nincs javaslat. Használd az appot!</string>
+    <string name="done">Kész</string>
+    <string name="shopping_store_sort">🏪 Rendezés bolt szerint</string>
+    <string name="close">Bezár</string>
+
+    <!-- Home Inventory -->
+    <string name="inventory_title">🏠 Ami otthon van</string>
+    <string name="inventory_add_item">Elem hozzáadása</string>
+    <string name="inventory_empty_title">Még nincs semmi otthon</string>
+    <string name="inventory_empty_subtitle">A vásárlás után jelennek meg az elemek</string>
+    <string name="inventory_search_hint">🔍 Keresés…</string>
+    <string name="inventory_search_empty">Nincs találat</string>
+    <string name="inventory_old_badge">⏰ Régi</string>
+    <string name="inventory_mark_fresh">Frissnek jelöl</string>
+    <string name="inventory_mark_old">Réginek jelöl</string>
+    <string name="amount_label">Mennyiség</string>
+    <string name="unit_label">Egység</string>
+    <string name="inventory_add_title">➕ Elem hozzáadása</string>
+    <string name="inventory_item_name">Elem neve</string>
+    <string name="category_label">Kategória:</string>
+    <string name="add">Hozzáadás</string>
+    <string name="inventory_pending_title">📦 Megvásárolt termékek — Mennyiség megadása</string>
+    <string name="custom_label">Egyéni</string>
+    <string name="inventory_proceed">✅ Tovább</string>
+    <string name="inventory_skip_item">Kihagyás</string>
+    <string name="later">Később</string>
+    <string name="pieces">darab</string>
+
+    <!-- Cook From Home -->
+    <string name="cook_title">👨‍🍳 Főzés abból ami van</string>
+    <string name="cook_items_at_home">🏠 %1$d elem van otthon</string>
+    <string name="cook_old_items_warning">⏰ %1$d elem régi — használd fel előbb!</string>
+    <string name="cook_extra_title">🛒 Extra hozzávalók engedélyezve</string>
+    <string name="cook_extra_none">Semmi — csak ami otthon van</string>
+    <string name="cook_extra_few">Néhány extra</string>
+    <string name="cook_extra_some">Több extra is jöhet</string>
+    <string name="cook_extra_lots">Sok extra is jöhet</string>
+    <string name="cook_prioritize_fridge">⏰ Hűtő kiürítése elsőbbséggel</string>
+    <string name="cook_prioritize_subtitle">Régi elemek felhasználása a pazarlás elkerüléséért</string>
+    <string name="cook_vegetarian">🥬 Vegetáriánus</string>
+    <string name="cook_meat_type">🥩 Hús típusa</string>
+    <string name="cook_any">Bármely</string>
+    <string name="cook_exclude_allergens">⚠️ Allergének kizárása</string>
+    <string name="cook_allergen_gluten">Glutén</string>
+    <string name="cook_allergen_dairy">Tejtermék</string>
+    <string name="cook_allergen_nuts">Diófélék</string>
+    <string name="cook_allergen_eggs">Tojás</string>
+    <string name="cook_allergen_soy">Szója</string>
+    <string name="cook_allergen_shellfish">Kagylófélék</string>
+    <string name="cook_dish_type">🍽️ Étel típusa</string>
+    <string name="cook_ai_thinking">AI gondolkodik…</string>
+    <string name="cook_generate">🔮 Recept ötletek generálása</string>
+    <string name="cook_suggestions_title">Recept javaslatok</string>
+
+    <!-- Settings -->
+    <string name="settings_title">⚙️ Beállítások</string>
+    <string name="settings_api_key_title">OpenAI API kulcs</string>
+    <string name="settings_api_key_desc">Az AI funkciókhoz szükséges: recept generálás, hangutasítások, blokk szkennelés és főzési javaslatok.</string>
+    <string name="settings_api_key_label">API kulcs</string>
+    <string name="settings_api_key_placeholder">sk-…</string>
+    <string name="settings_saved">✅ Mentve!</string>
+    <string name="settings_save_api_key">💾 API kulcs mentése</string>
+    <string name="settings_about_title">ℹ️ A KitchenBot-ról</string>
+    <string name="settings_about_body">Verzió 1.0\nAI-alapú konyhai asszisztensed.</string>
+    <string name="settings_language_title">🌐 Nyelv</string>
+    <string name="settings_language_hungarian">Magyar</string>
+    <string name="settings_language_english">English</string>
+
+    <!-- API Key Gate -->
+    <string name="gate_title">Üdvözöl a KitchenBot</string>
+    <string name="gate_description">Ez az alkalmazás AI-t használ a főzéshez. Kérlek add meg az OpenAI API kulcsodat a kezdéshez.</string>
+    <string name="gate_api_key_label">OpenAI API kulcs</string>
+    <string name="gate_api_key_placeholder">sk-…</string>
+    <string name="gate_error">Kérlek adj meg érvényes OpenAI API kulcsot (sk- előtaggal)</string>
+    <string name="gate_continue">Mentés és tovább</string>
+</resources>

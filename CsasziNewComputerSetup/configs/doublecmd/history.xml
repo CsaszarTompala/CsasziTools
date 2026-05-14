@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doublecmd>
+  <History>
+    <Navigation>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\RecToBsig\tmp\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\RecToBsig\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\RecToBsig\dist\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\UltimateSignalPlotter\dist\UltimateSignalPlotter\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\UltimateSignalPlotter\dist\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\UltimateSignalPlotter\</Item>
+      <Item>C:\GIT\</Item>
+      <Item>C:\GIT\jenkins-acm-ars6xx\config\</Item>
+      <Item>C:\GIT\jenkins-acm-ars6xx\config\jobs\</Item>
+      <Item>C:\GIT\jenkins-acm-ars6xx\</Item>
+      <Item>C:\Users\uig34076\</Item>
+      <Item>f:\par_rec\</Item>
+      <Item>f:\</Item>
+      <Item>C:\GIT\CsasziTools_AUMOVIO\UltimateSignalPlotter\resources\</Item>
+      <Item>C:\</Item>
+      <Item>C:\Private\</Item>
+      <Item>C:\Private\CsasziTools\</Item>
+      <Item>C:\Private\CsasziTools\RemoteDesktop\</Item>
+      <Item>C:\Private\CsasziTools\RemoteDesktop\dist\</Item>
+      <Item>C:\Private\CsasziTools\RemoteDesktop\build\</Item>
+      <Item>C:\Private\CsasziTools\RemoteDesktop\build\RemoteDesktopConnector\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\resources\</Item>
+      <Item>c:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\resources\pcap_files\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\resources\bsig_files\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\</Item>
+      <Item>c:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\pcap_files\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\</Item>
+      <Item>C:\Users\uig34076\Pictures\</Item>
+      <Item>C:\Users\</Item>
+      <Item>C:\Program Files\</Item>
+      <Item>C:\GIT\ARS620DP28_FFL_CQG5-6\</Item>
+      <Item>C:\GIT\trash\</Item>
+      <Item>C:\GIT\ARS620DP28_SW_TestEnv\06_Project\restbus_MRR581\</Item>
+      <Item>C:\GIT\ARS620DP28_SW_TestEnv\06_Project\</Item>
+      <Item>C:\GIT\ARS620DP28_SW_TestEnv\</Item>
+      <Item>C:\Private\CsasziGames\CsasziRush\levels\</Item>
+      <Item>e:\</Item>
+      <Item>C:\Private\CsasziGames\CsasziRush\</Item>
+      <Item>C:\Private\CsasziGames\</Item>
+      <Item>C:\Private\CsasziTools\CsasziCompare\</Item>
+      <Item>C:\Private\CsasziTools\CsasziGit\</Item>
+      <Item>C:\Private\CsasziTools\CsasziGit\csaszigit\</Item>
+      <Item>C:\GIT\contest-rad600\tools\ConTest\</Item>
+      <Item>C:\GIT\contest-rad600\tools\</Item>
+      <Item>C:\GIT\contest-rad600\</Item>
+      <Item>C:\Private\CsasziTools\TravelTool\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\ARS620DP28\resources\bsig_files\bsigs_to_test\</Item>
+      <Item>C:\GIT\ARS620DP28_system_test_tsf\recordings\</Item>
+      <Item>C:\Private\CsasziTools\BSIG_Analyzer\bsig_files\</Item>
+    </Navigation>
+    <CommandLine>
+      <Item>cmd</Item>
+      <Item>code .</Item>
+      <Item>git pull</Item>
+      <Item>git submodule update --init --recursive</Item>
+      <Item>git reset --hard HEAD</Item>
+      <Item>cod e.</Item>
+    </CommandLine>
+    <FileMask/>
+    <VolumeSize/>
+    <CreateDirectories>
+      <Item Tag="0">trash</Item>
+      <Item Tag="0">2</Item>
+      <Item Tag="0">reports</Item>
+      <Item Tag="0">bsig_files</Item>
+      <Item Tag="0">environment_variables_export</Item>
+      <Item Tag="0">ARS620DP28-3197 ALN EOL failed azimuth right</Item>
+      <Item Tag="0">ARS620DP28-3197: ALN EOL failed azimuth right</Item>
+    </CreateDirectories>
+    <SearchText/>
+    <SearchTextPath/>
+    <ReplaceText/>
+    <ReplaceTextPath/>
+    <RenameNameMask/>
+    <RenameExtMask/>
+    <SearchDirectories/>
+    <SearchExcludeFiles/>
+    <SearchExcludeDirectories/>
+  </History>
+</doublecmd>

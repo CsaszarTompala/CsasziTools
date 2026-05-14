@@ -7,9 +7,10 @@
 - [CsasziFlash](CsasziFlash)
 - [CsasziGit](CsasziGit)
 - [CsasziJira](CsasziJira)
+- [CsasziNewComputerSetup](CsasziNewComputerSetup)
 - [Mini_projects](Mini_projects)
 - [MoneySplitter](MoneySplitter)
-- [MoneySplitter2](MoneySplitter2)
+- [MoneySplitter_APP](MoneySplitter_APP)
 - [Mouse_and_keyboard_replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)
@@ -22,9 +23,10 @@
 - [CsasziFlash README](CsasziFlash/README.md)
 - [CsasziGit README](CsasziGit/README.md)
 - [CsasziJira README](CsasziJira/README.md)
+- [CsasziNewComputerSetup README](CsasziNewComputerSetup/README.md)
 - [Mini_projects / Unix Timestamper README](Mini_projects/Unix_timestamper/README.md)
 - [Money Splitter README](MoneySplitter/Python/README.md)
-- [Money Splitter Android README](MoneySplitter2/README.md)
+- [Money Splitter Android README](MoneySplitter_APP/README.md)
 - [Mouse and Keyboard Replayer README](Mouse_and_keyboard_replayer/README.md)
 - [OpenJenkins README](OpenJenkins/README.md)
 - [RemoteDesktop README](RemoteDesktop/README.md)
@@ -46,8 +48,9 @@
 - [CsasziFlash](CsasziFlash) — CLI tool for flashing ARS620DP28 ECU variants via Lauterbach (Trace32)
 - [CsasziGit](CsasziGit) — PyQt6 Git GUI with fully dockable panels, folder browser, Dracula theme, AI-assisted commands, integrated Git terminal, and CsasziCompare integration
 - [CsasziJira](CsasziJira) — CLI tool to bulk-close Jira stories and their subtasks, setting fix versions and transitioning to Done via the Jira REST API
+- [CsasziNewComputerSetup](CsasziNewComputerSetup) — One-shot Windows bootstrapper: installs preferred apps via winget (Double Commander, Git, Git Extensions, ...), deploys their config files, and installs the custom Y/Z-swap US keyboard layout (admin)
 - [Money Splitter](MoneySplitter/Python) — PyQt5 trip-expense splitter
-- [Money Splitter Android](MoneySplitter2) — Android/Kotlin Jetpack Compose trip-expense splitter (phone version)
+- [Money Splitter Android](MoneySplitter_APP) — Android/Kotlin Jetpack Compose trip-expense splitter with PDF export, expense settling, and trip dates
 - [Mouse and Keyboard Replayer](Mouse_and_keyboard_replayer)
 - [OpenJenkins](OpenJenkins)
 - [RemoteDesktop](RemoteDesktop)

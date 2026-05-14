@@ -5,11 +5,14 @@ Android phone version of the [MoneySplitter desktop app](../MoneySplitter/Python
 ## Features
 
 - **Trip management** — create, open, and delete trips from the home screen
+- **Trip dates** — optional start/end date range for each trip
 - **People** — add and remove people in each trip
-- **Expense tracking** — log expenses with amount, currency, payer, optional description, and partial splits
+- **Expense tracking** — log expenses with amount, currency, payer, name, description, optional date, and partial splits
+- **Settle expenses** — mark individual expenses as settled mid-trip (excluded from final balance calculations, still visible)
 - **Multi-currency support** — add/remove currencies, edit conversion rates, live-fetch from open.er-api.com
 - **Balance calculation** — per-person balances converted to a chosen result currency
 - **Settlement optimizer** — minimum-transfer plan to settle all debts
+- **PDF export** — generate and share a formatted trip report with all expenses, rates, balances, and settlements
 - **Undo/redo** — 50-step undo stack for all trip modifications
 - **Auto-save** — every change is persisted to JSON in app storage
 - **Material You** — dynamic colour theming (Android 12+), full light/dark mode support
@@ -36,6 +39,7 @@ app/src/main/java/com/example/moneysplitter/
 │   └── TripRepository.kt      # JSON persistence layer
 ├── logic/
 │   ├── Calculator.kt           # Balance & settlement calculation
+│   ├── PdfExporter.kt          # PDF report generation (Android PdfDocument)
 │   └── RateFetcher.kt          # Live exchange rate API
 ├── ui/
 │   ├── theme/                  # Material 3 Color, Theme, Typography

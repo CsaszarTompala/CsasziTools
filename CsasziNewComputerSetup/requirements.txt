@@ -1,0 +1,3 @@
+# CsasziNewComputerSetup runs on the Python standard library only.
+# This file exists so `pip install -r requirements.txt` works in the
+# standard setup flow. Add new dependencies here as needed.

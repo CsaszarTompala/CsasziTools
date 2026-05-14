@@ -35,6 +35,7 @@ object Calculator {
         trip.people.forEach { balances[it] = 0.0 }
 
         for (expense in trip.expenses) {
+            if (expense.settled) continue
             if (expense.amount <= 0 || expense.paidBy.isBlank()) continue
 
             val convertedAmount = convertAmount(

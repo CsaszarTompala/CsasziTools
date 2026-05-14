@@ -1,0 +1,13 @@
+Windows Registry Editor Version 5.00
+
+; Custom US English keyboard layout with Z and Y swapped.
+; Captured from a working machine; deployed by CsasziNewComputerSetup.
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\a0000409]
+"Layout Text"="amerikai - Custom"
+"Layout File"="Layout01.dll"
+"Layout Id"="00c0"
+"Layout Product Code"="{90CA46C3-0B30-474B-AF90-9E46FFBDE32D}"
+"Layout Display Name"="@%SystemRoot%\\system32\\Layout01.dll,-1000"
+"Custom Language Name"="English (United States)"
+"Custom Language Display Name"="@%SystemRoot%\\system32\\Layout01.dll,-1100"
