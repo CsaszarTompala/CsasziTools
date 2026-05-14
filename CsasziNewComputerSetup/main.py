@@ -324,6 +324,32 @@ def _find_code_cli() -> str | None:
     return None
 
 
+# Extensions that must be installed BEFORE other extensions in the same
+# family — otherwise VS Code prompts to install the missing parent runtime
+# (e.g. installing ms-python.debugpy before ms-python.python triggers the
+# "install Python?" prompt). Order matters within each list.
+VSCODE_EXTENSION_PRIORITY: list[str] = [
+    "ms-python.python",            # parent for debugpy / pylance / python-envs
+    "ms-vscode.cpptools",          # parent for cpptools-extension-pack / themes
+    "ms-toolsai.jupyter",          # parent for jupyter-keymap / renderers / cell-tags / slideshow
+]
+
+
+def _order_extensions(extensions: list[str]) -> list[str]:
+    """Hoist parent extensions to the front so dependents don't prompt."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for ext in VSCODE_EXTENSION_PRIORITY:
+        if ext in extensions and ext not in seen:
+            ordered.append(ext)
+            seen.add(ext)
+    for ext in extensions:
+        if ext not in seen:
+            ordered.append(ext)
+            seen.add(ext)
+    return ordered
+
+
 def install_vscode_extensions(dry_run: bool) -> bool:
     """Install every extension listed in configs/vscode/extensions.txt."""
     if not VSCODE_EXTENSIONS_FILE.exists():
@@ -338,6 +364,8 @@ def install_vscode_extensions(dry_run: bool) -> bool:
     if not extensions:
         info("extensions list is empty; nothing to install")
         return True
+
+    extensions = _order_extensions(extensions)
 
     code_cli = _find_code_cli()
     if not code_cli:
@@ -497,20 +525,49 @@ def install_claude_code(dry_run: bool) -> bool:
     info(f"running {CLAUDE_CODE_SCRIPT.name} for UID {uid}")
     info(f"  token: {token[:8]}... (hidden)")
     if dry_run:
-        info("  [dry-run] would feed token + UID into install_claude_code.ps1")
+        info("  [dry-run] would override Read-Host with token + UID and dot-source installer")
         return True
+
+    # Read-Host ignores redirected stdin (always opens the console), so piping
+    # values doesn't work. Instead, generate a wrapper script that defines a
+    # function named Read-Host in its scope — function lookup wins over cmdlet
+    # lookup — that returns queued answers in order, then dot-sources the
+    # corporate installer so the override is in scope while it runs.
+    wrapper = SCRIPT_DIR / ".claude_code_wrapper.ps1"
+    target = str(CLAUDE_CODE_SCRIPT).replace("'", "''")
+    wrapper.write_text(
+        "$ErrorActionPreference = 'Stop'\n"
+        f"$script:_answers = New-Object System.Collections.Queue\n"
+        f"$script:_answers.Enqueue({_ps_quote(token)}) | Out-Null\n"
+        f"$script:_answers.Enqueue({_ps_quote(uid)}) | Out-Null\n"
+        "function Read-Host {\n"
+        "    param([Parameter(ValueFromRemainingArguments=$true)] $args)\n"
+        "    $asSecure = $false\n"
+        "    foreach ($a in $args) { if ($a -ieq '-AsSecureString') { $asSecure = $true } }\n"
+        "    if ($script:_answers.Count -eq 0) { return '' }\n"
+        "    $value = [string]$script:_answers.Dequeue()\n"
+        "    if ($asSecure) { return (ConvertTo-SecureString -String $value -AsPlainText -Force) }\n"
+        "    return $value\n"
+        "}\n"
+        f". '{target}'\n",
+        encoding="utf-8",
+    )
 
     cmd = [
         "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-        "-File", str(CLAUDE_CODE_SCRIPT),
+        "-File", str(wrapper),
     ]
-    # The script prompts for token (SecureString) then UID — both via Read-Host,
-    # which reads one line each from redirected stdin.
-    stdin_payload = f"{token}\n{uid}\n"
-    res = subprocess.run(
-        cmd, input=stdin_payload, text=True, check=False,
-        encoding="utf-8", errors="replace",
-    )
+    try:
+        res = subprocess.run(
+            cmd, text=True, check=False,
+            encoding="utf-8", errors="replace",
+        )
+    finally:
+        try:
+            wrapper.unlink()
+        except OSError:
+            pass
+
     if res.returncode != 0:
         err(f"install_claude_code.ps1 exited {res.returncode}")
         return False
