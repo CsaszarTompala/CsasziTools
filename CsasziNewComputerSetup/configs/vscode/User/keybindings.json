@@ -1,0 +1,70 @@
+// Place your key bindings in this file to override the defaults
+[
+    {
+        "key": "ctrl+shift+oem_2",
+        "command": "editor.debug.action.selectionToRepl"
+    },
+    {
+        "key": "ctrl+q ctrl+s",
+        "command": "workbench.action.files.saveFiles"
+    },
+    {
+        "key": "ctrl+k s",
+        "command": "-saveAll"
+    },
+    {
+        "key": "ctrl+i ctrl+s",
+        "command": "issue.createIssueFromFile",
+        "when": "!issues.creatingFromFile && resourceScheme == 'newIssue' && config.files.autoSave != 'off'"
+    },
+    {
+        "key": "ctrl+s",
+        "command": "-issue.createIssueFromFile",
+        "when": "!issues.creatingFromFile && resourceScheme == 'newIssue' && config.files.autoSave != 'off'"
+    },
+    {
+        "key": "ctrl+s",
+        "command": "workbench.action.files.save",
+        "when": "notebookEditorFocused && !inputFocus && !notebookOutputInputFocused"
+    },
+    {
+        "key": "s",
+        "command": "-workbench.action.files.save",
+        "when": "notebookEditorFocused && !inputFocus && !notebookOutputInputFocused"
+    },
+    {
+        "key": "ctrl+alt+numpad1",
+        "command": "workbench.action.chat.changeModel",
+        "args": {
+            "vendor": "copilot",
+            "id": "claude-opus-4.7",
+            "family": "claude-opus-4.7"
+        }
+    },
+    {
+        "key": "ctrl+alt+numpad2",
+        "command": "workbench.action.chat.changeModel",
+        "args": {
+            "vendor": "copilot",
+            "id": "claude-sonnet-4.6",
+            "family": "claude-sonnet-4.6"
+        }
+    },
+    {
+        "key": "ctrl+alt+numpad3",
+        "command": "workbench.action.chat.changeModel",
+        "args": {
+            "vendor": "copilot",
+            "id": "claude-haiku-4.5",
+            "family": "claude-haiku-4.5"
+        }
+    },
+    {
+        "key": "shift+enter",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+            "text": "\u001b\r"
+        },
+        "when": "terminalFocus"
+    }
+]

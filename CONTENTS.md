@@ -48,7 +48,7 @@
 - [CsasziFlash](CsasziFlash) — CLI tool for flashing ARS620DP28 ECU variants via Lauterbach (Trace32)
 - [CsasziGit](CsasziGit) — PyQt6 Git GUI with fully dockable panels, folder browser, Dracula theme, AI-assisted commands, integrated Git terminal, and CsasziCompare integration
 - [CsasziJira](CsasziJira) — CLI tool to bulk-close Jira stories and their subtasks, setting fix versions and transitioning to Done via the Jira REST API
-- [CsasziNewComputerSetup](CsasziNewComputerSetup) — One-shot Windows bootstrapper: installs preferred apps via winget (Double Commander, Git, Git Extensions, ...), deploys their config files, and installs the custom Y/Z-swap US keyboard layout (admin)
+- [CsasziNewComputerSetup](CsasziNewComputerSetup) — One-shot Windows bootstrapper: installs preferred apps via winget (Double Commander, Git, Git Extensions, VS Code + extensions/settings, ...), deploys their config files, and installs the custom Y/Z-swap US keyboard layout (admin)
 - [Money Splitter](MoneySplitter/Python) — PyQt5 trip-expense splitter
 - [Money Splitter Android](MoneySplitter_APP) — Android/Kotlin Jetpack Compose trip-expense splitter with PDF export, expense settling, and trip dates
 - [Mouse and Keyboard Replayer](Mouse_and_keyboard_replayer)

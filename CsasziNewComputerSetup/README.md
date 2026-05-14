@@ -37,11 +37,37 @@ Or just double-click `run.bat`.
 | `doublecmd`     | Double Commander                 | `Alexx2000.DoubleCommander`       |       |
 | `git`           | Git                              | `Git.Git`                         |       |
 | `git-extensions`| Git Extensions                   | `GitExtensionsTeam.GitExtensions` |       |
+| `vscode`        | Visual Studio Code + ext + cfg   | `Microsoft.VisualStudioCode`      |       |
+| `claude-code`   | Claude Code (corp. gateway)      | — (custom action)                 |       |
 | `kbd-yz-swap`   | Custom US layout (Y/Z swapped)   | — (custom action)                 | ✓     |
+| `windows-language` | Windows language / locale     | — (custom action)                 | ✓     |
 
 After install, `doublecmd` deploys the snapshot in `configs/doublecmd/` to
 `%APPDATA%\doublecmd\`. Existing files are skipped by default — pass
 `--force-config` to overwrite.
+
+`vscode` installs VS Code via winget, then deploys `configs/vscode/User/`
+(settings, keybindings, snippets, prompts, `mcp.json`,
+`chatLanguageModels.json`) into `%APPDATA%\Code\User\`, then runs
+`code --install-extension <id>` for every line in
+`configs/vscode/extensions.txt`. To refresh the extensions list from your
+current machine: `code --list-extensions > configs\vscode\extensions.txt`.
+
+`claude-code` runs the corporate `install_claude_code.ps1` (bundled in
+`configs/claude-code/`) and feeds it the UID + JWT token from
+`configs/claude-code/credentials.json` over stdin so it runs unattended.
+The script installs Node.js + Git + Claude Code via winget, writes
+`C:\tools\claudecode\claudecode.bat` with all corporate env vars
+(`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `NO_PROXY`, ...), and sets
+up the extended status line. Open a fresh shell afterwards and run
+`claudecode`. Refresh `credentials.json` whenever the JWT rotates.
+
+`windows-language` reads `configs/windows-language/language-settings.json`
+and applies it through PowerShell: user language list (with input methods),
+default input method, format culture, home location, and — when elevated —
+the system locale and copy-to-welcome-screen / new-user-defaults. Reboot
+after applying for the system locale change to take effect. Edit the JSON
+to adjust without touching code.
 
 `kbd-yz-swap` copies `Layout01.dll` to both `System32` and `SysWOW64`,
 writes the machine-wide layout registration under

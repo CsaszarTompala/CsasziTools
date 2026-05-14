@@ -19,6 +19,7 @@ Add new apps by appending an Application(...) entry to APPS below.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -116,6 +117,7 @@ def winget_installed(package_id: str) -> bool:
         ["winget", "list", "--id", package_id, "--exact",
          "--accept-source-agreements", "--disable-interactivity"],
         capture_output=True, text=True, check=False,
+        encoding="utf-8", errors="replace",
     )
     if res.returncode != 0:
         return False
@@ -303,6 +305,220 @@ def install_keyboard_yz_swap(dry_run: bool) -> bool:
     return True
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom-action: VS Code extension installer
+# ──────────────────────────────────────────────────────────────────────────────
+
+VSCODE_EXTENSIONS_FILE = CONFIGS_DIR / "vscode" / "extensions.txt"
+
+
+def _find_code_cli() -> str | None:
+    """Locate the `code` / `code.cmd` CLI launcher."""
+    for candidate in ("code.cmd", "code"):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    fallback = Path(r"C:\Program Files\Microsoft VS Code\bin\code.cmd")
+    if fallback.exists():
+        return str(fallback)
+    return None
+
+
+def install_vscode_extensions(dry_run: bool) -> bool:
+    """Install every extension listed in configs/vscode/extensions.txt."""
+    if not VSCODE_EXTENSIONS_FILE.exists():
+        warn(f"no extensions list at {VSCODE_EXTENSIONS_FILE}; skipping")
+        return True
+
+    extensions = [
+        line.strip()
+        for line in VSCODE_EXTENSIONS_FILE.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    if not extensions:
+        info("extensions list is empty; nothing to install")
+        return True
+
+    code_cli = _find_code_cli()
+    if not code_cli:
+        err("`code` CLI not found in PATH. Open a new shell after installing VS Code "
+            "(winget adds it to PATH) and re-run with --app vscode.")
+        return False
+
+    info(f"installing {len(extensions)} VS Code extension(s) via {code_cli}")
+    failed: list[str] = []
+    for ext in extensions:
+        info(f"  + {ext}")
+        if dry_run:
+            continue
+        res = subprocess.run(
+            [code_cli, "--install-extension", ext, "--force"],
+            capture_output=True, text=True, check=False,
+            encoding="utf-8", errors="replace",
+        )
+        if res.returncode != 0:
+            err(f"    failed: {res.stderr.strip() or res.stdout.strip()}")
+            failed.append(ext)
+    if failed:
+        err(f"{len(failed)} extension(s) failed: {', '.join(failed)}")
+        return False
+    ok(f"all {len(extensions)} VS Code extension(s) installed")
+    return True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom-action: Windows language / locale
+# ──────────────────────────────────────────────────────────────────────────────
+
+WINLANG_CONFIG = CONFIGS_DIR / "windows-language" / "language-settings.json"
+
+
+def _ps_quote(s: str) -> str:
+    """Quote a string as a PowerShell single-quoted literal."""
+    return "'" + s.replace("'", "''") + "'"
+
+
+def _ps_string_array(values: list[str]) -> str:
+    return "@(" + ",".join(_ps_quote(v) for v in values) + ")"
+
+
+def _build_winlang_script(cfg: dict, want_admin_steps: bool) -> str:
+    """Render the PowerShell script that applies the language settings."""
+    lines: list[str] = ["$ErrorActionPreference = 'Stop'"]
+
+    # User-scope: language list with input methods.
+    lines.append("$list = New-WinUserLanguageList -Language 'en-US'")
+    lines.append("$list.Clear()")
+    for entry in cfg["user_language_list"]:
+        tag = _ps_quote(entry["tag"])
+        lines.append(f"$lang = New-WinUserLanguageList -Language {tag}")
+        lines.append(f"$lang[0].InputMethodTips.Clear()")
+        for tip in entry.get("input_method_tips", []):
+            lines.append(f"$lang[0].InputMethodTips.Add({_ps_quote(tip)})")
+        lines.append("$list.Add($lang[0])")
+    lines.append("Set-WinUserLanguageList -LanguageList $list -Force")
+
+    # Default input method.
+    if cfg.get("default_input_method"):
+        lines.append(
+            f"Set-WinDefaultInputMethodOverride -InputTip {_ps_quote(cfg['default_input_method'])}"
+        )
+
+    # Format culture.
+    if cfg.get("format_culture"):
+        lines.append(f"Set-Culture -CultureInfo {_ps_quote(cfg['format_culture'])}")
+
+    # Home location (GeoId).
+    if cfg.get("home_location_geo_id") is not None:
+        lines.append(f"Set-WinHomeLocation -GeoId {int(cfg['home_location_geo_id'])}")
+
+    # Admin-only steps.
+    if want_admin_steps:
+        if cfg.get("system_locale"):
+            lines.append(
+                f"Set-WinSystemLocale -SystemLocale {_ps_quote(cfg['system_locale'])}"
+            )
+        if cfg.get("copy_to_welcome_and_default_user"):
+            lines.append(
+                "if (Get-Command Copy-UserInternationalSettingsToSystem -ErrorAction SilentlyContinue) "
+                "{ Copy-UserInternationalSettingsToSystem -WelcomeScreen $true -NewUser $true }"
+            )
+
+    lines.append("Write-Host '[+] Windows language settings applied'")
+    return "\n".join(lines)
+
+
+def apply_windows_language(dry_run: bool) -> bool:
+    if sys.platform != "win32":
+        err("windows-language only supported on Windows")
+        return False
+    if not WINLANG_CONFIG.exists():
+        err(f"missing config: {WINLANG_CONFIG}")
+        return False
+
+    cfg = json.loads(WINLANG_CONFIG.read_text(encoding="utf-8"))
+    has_admin = is_admin()
+    want_admin_steps = has_admin
+    if not has_admin and (cfg.get("system_locale") or cfg.get("copy_to_welcome_and_default_user")):
+        warn("not elevated — skipping system-locale + copy-to-welcome-screen steps "
+             "(re-run with --elevate to apply them)")
+
+    script = _build_winlang_script(cfg, want_admin_steps)
+    info("PowerShell script to be executed:")
+    for line in script.splitlines():
+        print(f"      {line}")
+
+    if dry_run:
+        return True
+
+    res = subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+        capture_output=True, text=True, check=False,
+        encoding="utf-8", errors="replace",
+    )
+    if res.stdout:
+        for line in res.stdout.splitlines():
+            print(f"      {line}")
+    if res.returncode != 0:
+        err(f"powershell exited {res.returncode}: {res.stderr.strip()}")
+        return False
+    if want_admin_steps and cfg.get("system_locale"):
+        warn("system locale changed — reboot required for it to take effect")
+    return True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom-action: Claude Code (corporate gateway)
+# ──────────────────────────────────────────────────────────────────────────────
+
+CLAUDE_CODE_DIR = CONFIGS_DIR / "claude-code"
+CLAUDE_CODE_SCRIPT = CLAUDE_CODE_DIR / "install_claude_code.ps1"
+CLAUDE_CODE_CREDS = CLAUDE_CODE_DIR / "credentials.json"
+
+
+def install_claude_code(dry_run: bool) -> bool:
+    if sys.platform != "win32":
+        err("claude-code installer only supported on Windows")
+        return False
+    if not CLAUDE_CODE_SCRIPT.exists():
+        err(f"missing installer script: {CLAUDE_CODE_SCRIPT}")
+        return False
+    if not CLAUDE_CODE_CREDS.exists():
+        err(f"missing credentials: {CLAUDE_CODE_CREDS}")
+        return False
+
+    creds = json.loads(CLAUDE_CODE_CREDS.read_text(encoding="utf-8"))
+    token = creds.get("auth_token", "").strip()
+    uid = creds.get("uid", "").strip()
+    if not token or not uid:
+        err("credentials.json must contain non-empty 'auth_token' and 'uid'")
+        return False
+
+    info(f"running {CLAUDE_CODE_SCRIPT.name} for UID {uid}")
+    info(f"  token: {token[:8]}... (hidden)")
+    if dry_run:
+        info("  [dry-run] would feed token + UID into install_claude_code.ps1")
+        return True
+
+    cmd = [
+        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", str(CLAUDE_CODE_SCRIPT),
+    ]
+    # The script prompts for token (SecureString) then UID — both via Read-Host,
+    # which reads one line each from redirected stdin.
+    stdin_payload = f"{token}\n{uid}\n"
+    res = subprocess.run(
+        cmd, input=stdin_payload, text=True, check=False,
+        encoding="utf-8", errors="replace",
+    )
+    if res.returncode != 0:
+        err(f"install_claude_code.ps1 exited {res.returncode}")
+        return False
+    ok("Claude Code installed and configured against the corporate gateway")
+    info("open a new shell, then run: claudecode")
+    return True
+
+
 def _ensure_preload_entry(klid: str) -> None:
     """Make sure the given KLID appears in HKCU\\Keyboard Layout\\Preload."""
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Keyboard Layout\Preload") as k:
@@ -390,6 +606,21 @@ APPS: list[Application] = [
         notes="GUI for Git on Windows.",
     ),
     Application(
+        key="vscode",
+        name="Visual Studio Code",
+        winget_id="Microsoft.VisualStudioCode",
+        configs=[
+            ConfigCopy(
+                source="vscode/User",
+                destination="%APPDATA%/Code/User",
+                description="user settings, keybindings, snippets, prompts, mcp.json",
+            ),
+        ],
+        post_install=install_vscode_extensions,
+        notes="Editor + my user settings/keybindings/prompts + ~37 extensions "
+              "(see configs/vscode/extensions.txt).",
+    ),
+    Application(
         key="kbd-yz-swap",
         name="Keyboard layout: US Y/Z swap",
         winget_id=None,
@@ -398,6 +629,27 @@ APPS: list[Application] = [
         notes="Custom 'amerikai - Custom' layout (Y and Z swapped). "
               "Copies Layout01.dll to System32+SysWOW64 and writes HKLM/HKCU registry. "
               "Sign out / reboot after install for it to take effect.",
+    ),
+    Application(
+        key="claude-code",
+        name="Claude Code (corp. gateway)",
+        winget_id=None,
+        post_install=install_claude_code,
+        notes="Runs the corporate install_claude_code.ps1 with the bundled UID + JWT "
+              "token from configs/claude-code/credentials.json. Installs Claude Code "
+              "via winget, creates claudecode.bat with all env vars, sets up the "
+              "extended status line. Open a new shell and run `claudecode` after.",
+    ),
+    Application(
+        key="windows-language",
+        name="Windows language / locale",
+        winget_id=None,
+        post_install=apply_windows_language,
+        requires_admin=True,
+        notes="Applies user language list (en-US + hu), default input method "
+              "(custom Y/Z layout), format culture, home location and "
+              "system locale from configs/windows-language/language-settings.json. "
+              "Run kbd-yz-swap first. Reboot after — system locale change needs it.",
     ),
 ]
 

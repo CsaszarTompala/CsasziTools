@@ -1,0 +1,18 @@
+{
+  "_comment": "Windows language / locale snapshot deployed by CsasziNewComputerSetup. Edit values here, no code changes needed. InputMethodTips reference the custom Y/Z layout (a0000409) — make sure kbd-yz-swap runs first.",
+  "user_language_list": [
+    {
+      "tag": "en-US",
+      "input_method_tips": ["0409:A0000409", "0409:00000409"]
+    },
+    {
+      "tag": "hu",
+      "input_method_tips": ["040E:0000040E"]
+    }
+  ],
+  "default_input_method": "0409:A0000409",
+  "format_culture": "hu-HU",
+  "home_location_geo_id": 109,
+  "system_locale": "hu-HU",
+  "copy_to_welcome_and_default_user": true
+}

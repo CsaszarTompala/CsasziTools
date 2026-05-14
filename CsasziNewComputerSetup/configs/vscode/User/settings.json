@@ -1,0 +1,591 @@
+{
+    "workbench.colorTheme": "Dracula Theme",
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "explorer.confirmDelete": false,
+    "explorer.confirmDragAndDrop": false,
+    "files.associations": {
+        "*.pytest": "python"
+    },
+    // visual guide
+    "editor.rulers": [
+        100
+    ],
+    // Rewrap: hard-wrap comments automatically
+    "rewrap.autoWrap.enabled": true,
+    "rewrap.wrappingColumn": 100,
+    // Instructions for AI assistant:
+    // - Always use '#' for comments in Python.
+    // - Use camelCase for variable names and CAPS_CASE for constants.
+    // - Avoid multiline comments in Python.
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "file": ".copilot-codeGeneration-instructions.md"
+        },
+        {
+            "file": "c:/Users/uig34076/AppData/Roaming/Code/User/prompts/pr-review-workflow.instructions.md"
+        }
+    ],
+    "python.createEnvironment.trigger": "off",
+    "window.zoomLevel": -1.5778829311823859,
+    "explorer.confirmPasteNative": false,
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false
+    },
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^git\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ls\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cat\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^echo\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pwd$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^mkdir\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pip\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npm\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^grep\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^find\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^head\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^tail\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^wc\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^touch\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cp\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^mv\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^make\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^docker\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^curl\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^wget\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^tar\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^zip\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^unzip\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^gzip\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^chmod\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^chown\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ps\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^apt\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^brew\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^yum\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^java\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^javac\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^gcc\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^g\\+\\+\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^clang\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^gradle\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^mvn\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cargo\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^go\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ruby\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^gem\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^php\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^composer\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^bash\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sh\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sed\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^awk\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cut\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sort\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^uniq\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^diff\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^patch\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^file\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^basename\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^dirname\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^stat\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^date\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^whoami\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^groups\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^base64\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^md5sum\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sha256sum\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^strings\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^readlink\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^which\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^whereis\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^type\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^command\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^export\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^source\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^popd\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pushd\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^history\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^clear\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^tee\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^xargs\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^parallel\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^yarn\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^jest\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^mocha\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pytest\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^unittest\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^jq\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^vim\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^nano\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^less\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^more\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^env\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^printenv\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^lsof\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^netstat\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ss\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^traceroute\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ping\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^nslookup\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^dig\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^host\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ifconfig\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ip\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^uname\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^lsb_release\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^df\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^du\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^free\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^top\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^htop\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^fg\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^bg\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^jobs\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^tr\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^expand\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^unexpand\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^fold\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^paste\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^join\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^comm\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^nl\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^rev\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^od\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^hexdump\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^xxd\\b/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^find .* -type f .* \\( -name.*\\) .* | head/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^find .* \\| .*(grep|xargs|head|tail|wc|sort|uniq|cut|paste)/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^c:/LegacyApp/Python311/python\\.exe -c \"from PIL import Image; print\\('Pillow OK'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        ".\\gradlew.bat": true,
+        "./gradlew": true,
+        "/^\\$files = Get-ChildItem -Recurse -Filter \"\\*\\.kt\" -Path \"ui/screens\",\"ui/components\" \\| Where-Object \\{ \\$_\\.FullName -notmatch \"Theme\\\\\\.kt\\|Color\\\\\\.kt\" \\}\n\nforeach \\(\\$f in \\$files\\) \\{\n    \\$c = Get-Content \\$f\\.FullName -Raw\n    if \\(\\$c -match \"Dracula\\(Purple\\|Cyan\\|Green\\|Red\\|Yellow\\|Orange\\|Pink\\|Comment\\|Foreground\\|Current\\|Background\\)\"\\) \\{\n        \\$c = \\$c -replace '\\\\bDraculaPurple\\\\b', 'colors\\.primary'\n        \\$c = \\$c -replace '\\\\bDraculaCyan\\\\b', 'colors\\.accent'\n        \\$c = \\$c -replace '\\\\bDraculaGreen\\\\b', 'colors\\.green'\n        \\$c = \\$c -replace '\\\\bDraculaRed\\\\b', 'colors\\.red'\n        \\$c = \\$c -replace '\\\\bDraculaYellow\\\\b', 'colors\\.yellow'\n        \\$c = \\$c -replace '\\\\bDraculaOrange\\\\b', 'colors\\.orange'\n        \\$c = \\$c -replace '\\\\bDraculaPink\\\\b', 'colors\\.pink'\n        \\$c = \\$c -replace '\\\\bDraculaComment\\\\b', 'colors\\.comment'\n        \\$c = \\$c -replace '\\\\bDraculaForeground\\\\b', 'colors\\.foreground'\n        \\$c = \\$c -replace '\\\\bDraculaCurrent\\\\b', 'colors\\.current'\n        \\$c = \\$c -replace '\\\\bDraculaBackground\\\\b', 'colors\\.background'\n        Set-Content \\$f\\.FullName \\$c -NoNewline\n        Write-Host \"Updated: \\$\\(\\$f\\.Name\\)\"\n    \\}\n\\}\nWrite-Host \"Done\\.\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^C:/Private/CsasziGames/\\.venv/Scripts/pip\\.exe install pygame 2>&1 \\| tail -5$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    },
+    "chat.tools.urls.autoApprove": {
+        "https://pyinstaller.org/en/stable/usage.html": true,
+        "https://pyinstaller.org/en/stable": true,
+        "https://pyinstaller.org/en": true,
+        "https://pyinstaller.org": true,
+        "https://stackoverflow.com/questions/42755016/pyinstaller-not-using-icon": true,
+        "https://stackoverflow.com/questions/42755016": true,
+        "https://stackoverflow.com/questions": true,
+        "https://stackoverflow.com": true
+    },
+    "chat.agent.maxRequests": 5000,
+    "chat.autopilot.enabled": true,
+    "claudeCode.preferredLocation": "panel",
+    "chat.viewSessions.orientation": "stacked",
+    "git.openRepositoryInParentFolders": "always",
+    "window.confirmSaveUntitledWorkspace": false,
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "path": "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+        },
+        "Command Prompt": {
+            "path": [
+                "${env:windir}\\Sysnative\\cmd.exe",
+                "${env:windir}\\System32\\cmd.exe"
+            ],
+            "args": [],
+            "icon": "terminal-cmd"
+        },
+        "Git Bash": {
+            "source": "Git Bash",
+            "icon": "terminal-git-bash"
+        }
+    },
+}
