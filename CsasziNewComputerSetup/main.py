@@ -576,6 +576,142 @@ def install_claude_code(dry_run: bool) -> bool:
     return True
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom-action: Move Mouse (portable from GitHub)
+# ──────────────────────────────────────────────────────────────────────────────
+
+MOVEMOUSE_RELEASE_API = "https://api.github.com/repos/sw3103/movemouse/releases/latest"
+MOVEMOUSE_INSTALL_DIR = expand("%LOCALAPPDATA%/Programs/MoveMouse")
+MOVEMOUSE_EXE_NAME = "Move Mouse.exe"
+MOVEMOUSE_LNK_NAME = "Move Mouse.lnk"
+
+
+def _create_shortcut(lnk: Path, target: Path) -> bool:
+    """Create a .lnk file pointing at `target` via WScript.Shell."""
+    ps = (
+        "$ws = New-Object -ComObject WScript.Shell;"
+        f"$s = $ws.CreateShortcut({_ps_quote(str(lnk))});"
+        f"$s.TargetPath = {_ps_quote(str(target))};"
+        f"$s.WorkingDirectory = {_ps_quote(str(target.parent))};"
+        "$s.Save()"
+    )
+    res = subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+        capture_output=True, text=True, check=False,
+        encoding="utf-8", errors="replace",
+    )
+    if res.returncode != 0:
+        err(f"create shortcut failed: {(res.stderr or res.stdout).strip()}")
+        return False
+    return True
+
+
+def _pin_to_taskbar(lnk: Path) -> bool:
+    """Best-effort pin a .lnk to the taskbar via the Shell.Application verb.
+
+    Windows 11 22H2+ removed the 'Pin to taskbar' verb from Explorer's COM
+    namespace, so this can fail with no recourse other than asking the user
+    to right-click and pin manually.
+    """
+    folder = _ps_quote(str(lnk.parent))
+    name = _ps_quote(lnk.name)
+    ps = (
+        "$shell = New-Object -ComObject Shell.Application;"
+        f"$folder = $shell.Namespace({folder});"
+        "if (-not $folder) { exit 2 };"
+        f"$item = $folder.ParseName({name});"
+        "if (-not $item) { exit 3 };"
+        "$verb = $item.Verbs() | Where-Object { ($_.Name -replace '&','') -ieq 'Pin to taskbar' };"
+        "if (-not $verb) { exit 4 };"
+        "$verb.DoIt();"
+    )
+    res = subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+        capture_output=True, text=True, check=False,
+        encoding="utf-8", errors="replace",
+    )
+    return res.returncode == 0
+
+
+def install_movemouse(dry_run: bool) -> bool:
+    """Download the latest portable Move Mouse release and pin it to the taskbar."""
+    if sys.platform != "win32":
+        err("movemouse only supported on Windows")
+        return False
+
+    import urllib.request
+    import zipfile
+
+    info(f"querying latest release: {MOVEMOUSE_RELEASE_API}")
+    if dry_run:
+        info(f"[dry-run] would download portable zip → {MOVEMOUSE_INSTALL_DIR}")
+        info("[dry-run] would create Start Menu shortcut and pin to taskbar")
+        return True
+
+    try:
+        req = urllib.request.Request(
+            MOVEMOUSE_RELEASE_API,
+            headers={"User-Agent": "CsasziNewComputerSetup"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            release = json.load(r)
+    except Exception as exc:  # noqa: BLE001
+        err(f"cannot fetch release info: {exc}")
+        return False
+
+    zip_asset = next(
+        (a for a in release.get("assets", []) if a["name"].lower().endswith(".zip")),
+        None,
+    )
+    if not zip_asset:
+        err("no .zip asset in latest release")
+        return False
+
+    zip_url = zip_asset["browser_download_url"]
+    info(f"download {zip_url}")
+    tmp_zip = SCRIPT_DIR / ".movemouse.zip"
+    try:
+        urllib.request.urlretrieve(zip_url, tmp_zip)
+    except Exception as exc:  # noqa: BLE001
+        err(f"download failed: {exc}")
+        return False
+
+    try:
+        info(f"extract → {MOVEMOUSE_INSTALL_DIR}")
+        MOVEMOUSE_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(tmp_zip) as z:
+            z.extractall(MOVEMOUSE_INSTALL_DIR)
+    finally:
+        try:
+            tmp_zip.unlink()
+        except OSError:
+            pass
+
+    exe = MOVEMOUSE_INSTALL_DIR / MOVEMOUSE_EXE_NAME
+    if not exe.exists():
+        matches = list(MOVEMOUSE_INSTALL_DIR.rglob(MOVEMOUSE_EXE_NAME))
+        if not matches:
+            err(f"could not locate {MOVEMOUSE_EXE_NAME!r} after extracting")
+            return False
+        exe = matches[0]
+
+    start_menu = expand("%APPDATA%/Microsoft/Windows/Start Menu/Programs")
+    lnk = start_menu / MOVEMOUSE_LNK_NAME
+    info(f"create shortcut → {lnk}")
+    if not _create_shortcut(lnk, exe):
+        return False
+
+    info("pin to taskbar")
+    if _pin_to_taskbar(lnk):
+        ok("Move Mouse pinned to taskbar")
+    else:
+        warn("could not pin to taskbar automatically (Windows 11 22H2+ removed the verb) — "
+             "right-click the Start Menu entry and choose 'Pin to taskbar'")
+
+    ok(f"Move Mouse installed at {MOVEMOUSE_INSTALL_DIR}")
+    return True
+
+
 def _ensure_preload_entry(klid: str) -> None:
     """Make sure the given KLID appears in HKCU\\Keyboard Layout\\Preload."""
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Keyboard Layout\Preload") as k:
@@ -696,6 +832,17 @@ APPS: list[Application] = [
               "token from configs/claude-code/credentials.json. Installs Claude Code "
               "via winget, creates claudecode.bat with all env vars, sets up the "
               "extended status line. Open a new shell and run `claudecode` after.",
+    ),
+    Application(
+        key="movemouse",
+        name="Move Mouse",
+        winget_id=None,
+        post_install=install_movemouse,
+        notes="Downloads the latest portable release from "
+              "https://github.com/sw3103/movemouse/releases, extracts to "
+              "%LOCALAPPDATA%\\Programs\\MoveMouse, creates a Start Menu shortcut "
+              "and pins it to the taskbar (best-effort — Windows 11 22H2+ may "
+              "block programmatic taskbar pinning).",
     ),
     Application(
         key="windows-language",

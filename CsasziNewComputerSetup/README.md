@@ -39,6 +39,7 @@ Or just double-click `run.bat`.
 | `git-extensions`| Git Extensions                   | `GitExtensionsTeam.GitExtensions` |       |
 | `vscode`        | Visual Studio Code + ext + cfg   | `Microsoft.VisualStudioCode`      |       |
 | `claude-code`   | Claude Code (corp. gateway)      | — (custom action)                 |       |
+| `movemouse`     | Move Mouse (portable, taskbar)   | — (custom action)                 |       |
 | `kbd-yz-swap`   | Custom US layout (Y/Z swapped)   | — (custom action)                 | ✓     |
 | `windows-language` | Windows language / locale     | — (custom action)                 | ✓     |
 
@@ -61,6 +62,14 @@ The script installs Node.js + Git + Claude Code via winget, writes
 (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `NO_PROXY`, ...), and sets
 up the extended status line. Open a fresh shell afterwards and run
 `claudecode`. Refresh `credentials.json` whenever the JWT rotates.
+
+`movemouse` queries the GitHub release API for the latest
+[sw3103/movemouse](https://github.com/sw3103/movemouse/releases) zip,
+extracts it to `%LOCALAPPDATA%\Programs\MoveMouse\`, drops a `.lnk` into
+the user's Start Menu, and tries to pin it to the taskbar via
+`Shell.Application` verbs. The pin step is best-effort — Windows 11 22H2+
+removed the programmatic 'Pin to taskbar' verb, in which case the script
+warns and you have to right-click the Start Menu entry to pin manually.
 
 `windows-language` reads `configs/windows-language/language-settings.json`
 and applies it through PowerShell: user language list (with input methods),
