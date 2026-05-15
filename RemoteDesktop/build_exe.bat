@@ -26,15 +26,7 @@ if exist "%~dp0RemoteDesktopConnector.spec" del /q "%~dp0RemoteDesktopConnector.
 
 REM Build the executable
 cd /d "%~dp0"
-pyinstaller --noconfirm --clean --onefile --windowed ^
-    --name "RemoteDesktopConnector" ^
-    --icon "logo_RD.ico" ^
-    --add-data "logo_RD.png;." ^
-    --add-data "logo_RD.ico;." ^
-    --add-data "RemoteDesktopConnector_logo.png;." ^
-    --paths "%~dp0" ^
-    --hidden-import ui --hidden-import logic --hidden-import data ^
-    main.py
+pyinstaller --noconfirm --clean --onefile --windowed --name "RemoteDesktopConnector" --icon "logo_RD.ico" --add-data "logo_RD.png;." --add-data "logo_RD.ico;." --add-data "RemoteDesktopConnector_logo.png;." --paths "%CD%" --hidden-import ui --hidden-import logic --hidden-import data main.py
 
 echo.
 if exist "%~dp0dist\RemoteDesktopConnector.exe" (
